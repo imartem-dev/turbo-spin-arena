@@ -37,18 +37,18 @@ const arenaTextureSettings: ArenaTextureSettings = {
   offsetX: 0,
   offsetY: 0,
   scale: 1,
-  rotation: 0,
+  rotation: Math.PI,
 };
 const tileTextureSettings: TileTextureSettings = {
-  offsetX: 0,
-  offsetY: 0,
-  scale: 1,
-  rotation: 0,
+  offsetX: -1,
+  offsetY: -0.41,
+  scale: 0.2,
+  rotation: -Math.PI,
 };
 const backdropTextureSettings: BackdropTextureSettings = {
-  offsetX: 0,
-  offsetY: 0,
-  scale: 1,
+  offsetX: -0.04,
+  offsetY: 0.06,
+  scale: 0.86,
   rotation: 0,
 };
 const rimSurfaceTexture = new THREE.TextureLoader().load(rimTextureUrl);

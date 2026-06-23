@@ -35,6 +35,67 @@
         visibility: hidden;
       }
 
+      .orientation-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        place-items: center;
+        background: #101010;
+      }
+
+      .orientation-icon {
+        position: relative;
+        width: 112px;
+        height: 94px;
+        color: #ffffff;
+      }
+
+      .orientation-phone {
+        position: absolute;
+        border: 3px solid currentColor;
+        border-radius: 7px;
+      }
+
+      .orientation-phone.portrait {
+        left: 4px;
+        top: 4px;
+        width: 36px;
+        height: 80px;
+      }
+
+      .orientation-phone.landscape {
+        left: 25px;
+        bottom: 0;
+        width: 78px;
+        height: 36px;
+      }
+
+      .orientation-arrow {
+        position: absolute;
+        left: 50px;
+        top: 18px;
+        width: 31px;
+        height: 31px;
+        border-top: 6px solid currentColor;
+        border-right: 6px solid currentColor;
+        border-radius: 0 24px 0 0;
+        transform: rotate(28deg);
+      }
+
+      .orientation-arrow::after {
+        position: absolute;
+        right: -11px;
+        bottom: -8px;
+        width: 0;
+        height: 0;
+        border-left: 9px solid currentColor;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        content: "";
+        transform: rotate(45deg);
+      }
+
       .main-menu {
         position: fixed;
         inset: 0;
@@ -308,9 +369,44 @@
         display: none !important;
       }
 
-      .texture-settings-panel {
+      .light-settings-toggle {
         position: fixed;
         top: 86px;
+        right: 16px;
+        z-index: 9;
+        display: none;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        background: rgba(7, 11, 9, 0.72);
+        color: rgba(238, 247, 238, 0.92);
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      .light-settings-toggle::before {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        background:
+          radial-gradient(circle, currentColor 0 3px, transparent 3.5px),
+          linear-gradient(currentColor, currentColor) 50% 0 / 2px 100% no-repeat,
+          linear-gradient(90deg, currentColor, currentColor) 0 50% / 100% 2px no-repeat;
+        content: "";
+        transform: translate(-50%, -50%);
+      }
+
+      body.match-started .light-settings-toggle {
+        display: block;
+      }
+
+      .light-settings-panel {
+        position: fixed;
+        top: 126px;
         right: 16px;
         z-index: 8;
         display: none;
@@ -328,74 +424,25 @@
         user-select: none;
       }
 
-      body.match-started .texture-settings-panel {
+      body.match-started .light-settings-panel:not([hidden]) {
         display: flex;
       }
 
-      .texture-settings-title {
+      .light-settings-title {
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0;
       }
 
-      .texture-settings-tabs {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 4px;
-      }
-
-      .texture-settings-tab {
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        border-radius: 4px;
-        background: rgba(0, 0, 0, 0.24);
-        color: rgba(238, 247, 238, 0.9);
-        font: inherit;
-        font-weight: 800;
-        cursor: pointer;
-      }
-
-      .texture-settings-tab.active {
-        background: rgba(75, 132, 178, 0.72);
-      }
-
-      .texture-settings-page {
-        display: none;
-        flex-direction: column;
-        gap: 7px;
-      }
-
-      .texture-settings-page.active {
-        display: flex;
-      }
-
-      .texture-settings-panel:has([data-texture-tab="camera"]:checked) [data-texture-page="textures"],
-      .texture-settings-panel:has([data-texture-tab="textures"]:checked) [data-texture-page="camera"] {
-        display: none;
-      }
-
-      .texture-settings-panel:has([data-texture-tab="textures"]:checked) [data-texture-page="textures"],
-      .texture-settings-panel:has([data-texture-tab="camera"]:checked) [data-texture-page="camera"] {
-        display: flex;
-      }
-
-      .texture-settings-panel input[name="texture-settings-tab"] {
-        display: none;
-      }
-
-      .texture-settings-panel:has([data-texture-tab="textures"]:checked) label[for="texture-tab-textures"],
-      .texture-settings-panel:has([data-texture-tab="camera"]:checked) label[for="texture-tab-camera"] {
-        background: rgba(75, 132, 178, 0.72);
-      }
-
-      .texture-settings-panel .setting-row {
+      .light-settings-panel .setting-row {
         grid-template-columns: 72px 1fr 64px;
       }
 
-      .texture-settings-panel .setting-row.wide {
+      .light-settings-panel .setting-row.wide {
         grid-template-columns: 1fr auto;
       }
 
-      .texture-settings-panel input[type="number"] {
+      .light-settings-panel input[type="number"] {
         width: 64px;
         min-width: 0;
         border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1031,6 +1078,131 @@
         }
       }
 
+      @media (orientation: landscape) and (max-height: 520px) {
+        .main-menu {
+          grid-template-columns: minmax(250px, 40vw) 1fr;
+          gap: clamp(14px, 3vw, 28px);
+          padding: clamp(12px, 3.5vh, 20px) clamp(16px, 4vw, 32px);
+          overflow-y: auto;
+        }
+
+        .menu-left {
+          gap: 8px;
+          max-width: 420px;
+        }
+
+        .menu-title {
+          margin-bottom: 4px;
+          font-size: clamp(30px, 10vh, 46px);
+        }
+
+        .menu-section-label,
+        .element-title {
+          font-size: clamp(12px, 3.2vh, 16px);
+        }
+
+        .menu-modes,
+        .menu-settings {
+          width: min(390px, 44vw);
+        }
+
+        .menu-action,
+        .menu-mode {
+          min-height: clamp(34px, 9vh, 46px);
+          padding: 8px 22px;
+          font-size: clamp(18px, 5.8vh, 28px);
+        }
+
+        .menu-setting-row,
+        .menu-difficulty-row {
+          grid-template-columns: 86px 1fr 34px;
+          min-height: 24px;
+          font-size: 12px;
+        }
+
+        .menu-difficulty-row {
+          grid-template-columns: 86px 1fr;
+        }
+
+        .menu-difficulty-buttons button {
+          min-height: 24px;
+        }
+
+        .element-panel {
+          justify-self: center;
+          gap: 9px;
+        }
+
+        .element-grid {
+          grid-template-columns: repeat(4, minmax(64px, 112px));
+          gap: clamp(8px, 2vw, 18px);
+        }
+
+        .element-choice {
+          width: clamp(64px, 17vh, 112px);
+        }
+
+        .deathmatch-scoreboard-button {
+          top: 10px;
+          width: min(240px, calc(100vw - 20px));
+          min-height: 42px;
+          padding: 9px 22px;
+          font-size: 22px;
+        }
+
+        .rpm-hud {
+          bottom: 10px;
+          width: min(210px, calc(50vw - 24px));
+        }
+
+        .rpm-card {
+          padding: 6px;
+        }
+
+        .mobile-controls {
+          padding: 0 14px 10px;
+        }
+
+        .mobile-joystick {
+          width: 88px;
+          height: 88px;
+        }
+
+        .mobile-joystick-thumb {
+          width: 40px;
+          height: 40px;
+        }
+
+        .mobile-action-button {
+          width: 58px;
+          height: 58px;
+          font-size: 15px;
+        }
+
+        .light-settings-toggle {
+          top: 58px;
+          right: 10px;
+        }
+
+        .light-settings-panel {
+          top: 98px;
+          right: 10px;
+          width: min(250px, calc(100vw - 20px));
+          max-height: calc(100svh - 108px);
+          overflow-y: auto;
+        }
+      }
+
+      @media (orientation: portrait) {
+        body > :not(.orientation-overlay) {
+          display: none !important;
+        }
+
+        .orientation-overlay {
+          display: grid;
+        }
+      }
+
       @media (hover: none), (pointer: coarse), (max-width: 760px) {
         body.match-started .mobile-controls {
           display: flex;
@@ -1039,6 +1211,13 @@
     </style>
   </head>
   <body>
+    <div class="orientation-overlay" data-orientation-overlay aria-hidden="true">
+      <div class="orientation-icon">
+        <span class="orientation-phone portrait"></span>
+        <span class="orientation-phone landscape"></span>
+        <span class="orientation-arrow"></span>
+      </div>
+    </div>
     <section class="main-menu" data-start-menu>
       <div class="menu-left">
         <h1 class="menu-title" data-i18n="game.title">Turbo Spin Arena</h1>
@@ -1060,6 +1239,11 @@
             <span data-i18n="settings.enemies">Bots</span>
             <input data-enemy-count type="range" min="0" max="9" step="1" value="1" />
             <output data-enemy-count-value>1</output>
+          </label>
+          <label class="menu-setting-row">
+            <span data-i18n="settings.spinnerSize">Size</span>
+            <input data-spinner-size type="range" min="0.6" max="3" step="0.05" value="1" />
+            <output data-spinner-size-value>1.00</output>
           </label>
           <div class="menu-difficulty-row">
             <span data-i18n="settings.botLevel">Bot level</span>
@@ -1216,97 +1400,33 @@
         <output></output>
       </label>
     </div>
-    <div class="texture-settings-panel" aria-label="Debug visual controls">
-      <div class="texture-settings-tabs">
-        <input id="texture-tab-textures" data-texture-tab="textures" name="texture-settings-tab" type="radio" checked />
-        <label class="texture-settings-tab" for="texture-tab-textures">Textures</label>
-        <input id="texture-tab-camera" data-texture-tab="camera" name="texture-settings-tab" type="radio" />
-        <label class="texture-settings-tab" for="texture-tab-camera">Camera/Light</label>
-      </div>
-      <div class="texture-settings-page" data-texture-page="textures">
-      <div class="texture-settings-title">Bowl texture</div>
-      <label class="setting-row" data-tooltip="Move the test arena texture horizontally.">
-        <span>Tex X</span>
-        <input data-arena-texture-setting="offsetX" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-arena-texture-value="offsetX" type="number" min="-1" max="1" step="0.01" value="0" />
+    <button class="light-settings-toggle" data-light-settings-toggle type="button" aria-pressed="true" data-i18n-aria="settings.lightToggle"></button>
+    <div class="light-settings-panel" data-light-settings-panel aria-label="Light settings">
+      <div class="light-settings-title" data-i18n="settings.light">Light</div>
+      <label class="setting-row wide">
+        <span data-i18n="settings.lightDisabled">Disable all light</span>
+        <input data-light-disabled type="checkbox" />
       </label>
-      <label class="setting-row" data-tooltip="Move the test arena texture vertically.">
-        <span>Tex Y</span>
-        <input data-arena-texture-setting="offsetY" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-arena-texture-value="offsetY" type="number" min="-1" max="1" step="0.01" value="0" />
+      <label class="setting-row">
+        <span data-i18n="settings.lightAmbient">Ambient</span>
+        <input data-light-setting="ambient" type="range" min="0" max="4" step="0.05" value="1.55" />
+        <input data-light-value="ambient" type="number" min="0" max="4" step="0.05" value="1.55" />
       </label>
-      <label class="setting-row" data-tooltip="Scale the test arena texture. Higher values make the image larger.">
-        <span>Tex scale</span>
-        <input data-arena-texture-setting="scale" type="range" min="0.5" max="2" step="0.01" value="1" />
-        <input data-arena-texture-value="scale" type="number" min="0.5" max="2" step="0.01" value="1" />
+      <label class="setting-row">
+        <span data-i18n="settings.lightHemisphere">Hemi</span>
+        <input data-light-setting="hemisphere" type="range" min="0" max="4" step="0.05" value="0.72" />
+        <input data-light-value="hemisphere" type="number" min="0" max="4" step="0.05" value="0.72" />
       </label>
-      <label class="setting-row" data-tooltip="Rotate the test arena texture in degrees.">
-        <span>Tex rot</span>
-        <input data-arena-texture-setting="rotation" type="range" min="-180" max="180" step="1" value="0" />
-        <input data-arena-texture-value="rotation" type="number" min="-180" max="180" step="1" value="0" />
+      <label class="setting-row">
+        <span data-i18n="settings.lightKey">Key</span>
+        <input data-light-setting="key" type="range" min="0" max="6" step="0.05" value="2.35" />
+        <input data-light-value="key" type="number" min="0" max="6" step="0.05" value="2.35" />
       </label>
-      <div class="texture-settings-title">Tile texture</div>
-      <label class="setting-row" data-tooltip="Move the outer tile texture horizontally.">
-        <span>Tile X</span>
-        <input data-tile-texture-setting="offsetX" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-tile-texture-value="offsetX" type="number" min="-1" max="1" step="0.01" value="0" />
+      <label class="setting-row">
+        <span data-i18n="settings.lightFill">Fill</span>
+        <input data-light-setting="fill" type="range" min="0" max="4" step="0.05" value="0.18" />
+        <input data-light-value="fill" type="number" min="0" max="4" step="0.05" value="0.18" />
       </label>
-      <label class="setting-row" data-tooltip="Move the outer tile texture vertically.">
-        <span>Tile Y</span>
-        <input data-tile-texture-setting="offsetY" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-tile-texture-value="offsetY" type="number" min="-1" max="1" step="0.01" value="0" />
-      </label>
-      <label class="setting-row" data-tooltip="Scale the outer tile texture. Higher values make the tiles larger.">
-        <span>Tile scale</span>
-        <input data-tile-texture-setting="scale" type="range" min="0.2" max="4" step="0.01" value="1" />
-        <input data-tile-texture-value="scale" type="number" min="0.2" max="4" step="0.01" value="1" />
-      </label>
-      <label class="setting-row" data-tooltip="Rotate the outer tile texture in degrees.">
-        <span>Tile rot</span>
-        <input data-tile-texture-setting="rotation" type="range" min="-180" max="180" step="1" value="0" />
-        <input data-tile-texture-value="rotation" type="number" min="-180" max="180" step="1" value="0" />
-      </label>
-      <div class="texture-settings-title">Background texture</div>
-      <label class="setting-row" data-tooltip="Move the backdrop texture horizontally.">
-        <span>Bg X</span>
-        <input data-backdrop-texture-setting="offsetX" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-backdrop-texture-value="offsetX" type="number" min="-1" max="1" step="0.01" value="0" />
-      </label>
-      <label class="setting-row" data-tooltip="Move the backdrop texture vertically.">
-        <span>Bg Y</span>
-        <input data-backdrop-texture-setting="offsetY" type="range" min="-1" max="1" step="0.01" value="0" />
-        <input data-backdrop-texture-value="offsetY" type="number" min="-1" max="1" step="0.01" value="0" />
-      </label>
-      <label class="setting-row" data-tooltip="Scale the backdrop texture. Higher values make the image larger.">
-        <span>Bg scale</span>
-        <input data-backdrop-texture-setting="scale" type="range" min="0.5" max="3" step="0.01" value="1" />
-        <input data-backdrop-texture-value="scale" type="number" min="0.5" max="3" step="0.01" value="1" />
-      </label>
-      </div>
-      <div class="texture-settings-page" data-texture-page="camera">
-      <div class="texture-settings-title">Game camera</div>
-      <label class="setting-row"><span>Cam X</span><input data-camera-setting="gameX" type="range" min="-10" max="10" step="0.1" value="0" /><input data-camera-value="gameX" type="number" min="-10" max="10" step="0.1" value="0" /></label>
-      <label class="setting-row"><span>Cam Y</span><input data-camera-setting="gameY" type="range" min="2" max="20" step="0.1" value="16" /><input data-camera-value="gameY" type="number" min="2" max="20" step="0.1" value="16" /></label>
-      <label class="setting-row"><span>Cam Z</span><input data-camera-setting="gameZ" type="range" min="2" max="24" step="0.1" value="14.1" /><input data-camera-value="gameZ" type="number" min="2" max="24" step="0.1" value="14.1" /></label>
-      <label class="setting-row"><span>Look X</span><input data-camera-setting="lookAtX" type="range" min="-8" max="8" step="0.1" value="0" /><input data-camera-value="lookAtX" type="number" min="-8" max="8" step="0.1" value="0" /></label>
-      <label class="setting-row"><span>Look Y</span><input data-camera-setting="lookAtY" type="range" min="-2" max="6" step="0.1" value="-2" /><input data-camera-value="lookAtY" type="number" min="-2" max="6" step="0.1" value="-2" /></label>
-      <label class="setting-row"><span>Look Z</span><input data-camera-setting="lookAtZ" type="range" min="-8" max="8" step="0.1" value="2.1" /><input data-camera-value="lookAtZ" type="number" min="-8" max="8" step="0.1" value="2.1" /></label>
-      <label class="setting-row"><span>Min zoom</span><input data-camera-setting="minDistance" type="range" min="4" max="21" step="0.1" value="18" /><input data-camera-value="minDistance" type="number" min="4" max="21" step="0.1" value="18" /></label>
-      <label class="setting-row"><span>Max zoom</span><input data-camera-setting="maxDistance" type="range" min="8" max="40" step="0.1" value="21" /><input data-camera-value="maxDistance" type="number" min="8" max="40" step="0.1" value="21" /></label>
-      <div class="texture-settings-title">Death camera</div>
-      <label class="setting-row"><span>Dead X</span><input data-camera-setting="deathOffsetX" type="range" min="-8" max="8" step="0.1" value="0" /><input data-camera-value="deathOffsetX" type="number" min="-8" max="8" step="0.1" value="0" /></label>
-      <label class="setting-row"><span>Dead Y</span><input data-camera-setting="deathOffsetY" type="range" min="0" max="8" step="0.1" value="2.4" /><input data-camera-value="deathOffsetY" type="number" min="0" max="8" step="0.1" value="2.4" /></label>
-      <label class="setting-row"><span>Dead Z</span><input data-camera-setting="deathOffsetZ" type="range" min="-2" max="10" step="0.1" value="5" /><input data-camera-value="deathOffsetZ" type="number" min="-2" max="10" step="0.1" value="5" /></label>
-      <label class="setting-row"><span>DLook X</span><input data-camera-setting="deathLookAtX" type="range" min="-4" max="4" step="0.1" value="0" /><input data-camera-value="deathLookAtX" type="number" min="-4" max="4" step="0.1" value="0" /></label>
-      <label class="setting-row"><span>DLook Y</span><input data-camera-setting="deathLookAtY" type="range" min="-1" max="4" step="0.1" value="1.1" /><input data-camera-value="deathLookAtY" type="number" min="-1" max="4" step="0.1" value="1.1" /></label>
-      <label class="setting-row"><span>DLook Z</span><input data-camera-setting="deathLookAtZ" type="range" min="-4" max="4" step="0.1" value="0" /><input data-camera-value="deathLookAtZ" type="number" min="-4" max="4" step="0.1" value="0" /></label>
-      <div class="texture-settings-title">Light</div>
-      <label class="setting-row wide"><span>Disable all light</span><input data-light-disabled type="checkbox" /></label>
-      <label class="setting-row"><span>Ambient</span><input data-light-setting="ambient" type="range" min="0" max="4" step="0.05" value="1.55" /><input data-light-value="ambient" type="number" min="0" max="4" step="0.05" value="1.55" /></label>
-      <label class="setting-row"><span>Hemi</span><input data-light-setting="hemisphere" type="range" min="0" max="4" step="0.05" value="0.72" /><input data-light-value="hemisphere" type="number" min="0" max="4" step="0.05" value="0.72" /></label>
-      <label class="setting-row"><span>Key</span><input data-light-setting="key" type="range" min="0" max="6" step="0.05" value="2.35" /><input data-light-value="key" type="number" min="0" max="6" step="0.05" value="2.35" /></label>
-      <label class="setting-row"><span>Fill</span><input data-light-setting="fill" type="range" min="0" max="4" step="0.05" value="0.18" /><input data-light-value="fill" type="number" min="0" max="4" step="0.05" value="0.18" /></label>
-      </div>
     </div>
     <div class="fps-counter" data-fps-counter>FPS: --</div>
     <button class="deathmatch-scoreboard-button" data-deathmatch-scoreboard type="button" aria-pressed="false">

@@ -25,12 +25,6 @@ import {
   getActiveArenaHeight,
   getArenaEdgePoint,
   projectToArenaSurface,
-  setArenaTextureSetting,
-  setBackdropTextureSetting,
-  setTileTextureSetting,
-  type ArenaTextureSettings,
-  type BackdropTextureSettings,
-  type TileTextureSettings,
 } from "./arenas/bowlArena";
 import { createTranslator, detectLanguage } from "./i18n";
 import { createDashState, getDashSpeedMultiplier, tryStartDash, updateDashState, type DashState } from "./simulation/dash";
@@ -214,6 +208,7 @@ type SpinnerState = {
   flash: FlashState;
   deathmatchVisual: DeathmatchVisualState;
   forwardDirection: THREE.Vector3;
+  baseRadius: number;
   radius: number;
   spinSpeed: number;
   pulseTimer: number;
@@ -391,6 +386,7 @@ const botDifficultyPresets: Record<
   hard: { minDecisionTime: 0.2, maxDecisionTime: 0.35, cursorAngularSpeed: Math.PI * 1.55, cursorRadialSpeed: 10 },
 };
 const debugSettingStoragePrefix = "turbo-spin-arena.debug.";
+let spinnerSizeScale = 1;
 
 const maxTrailPoints = 28;
 const maxTrailRibbonPoints = (maxTrailPoints + 1) * 2;
@@ -543,11 +539,9 @@ setEnemyCount(1);
 hudElements = createRpmHud(player, enemySpinners);
 setupSettingTooltips();
 setupEnemyCountControl();
+setupSpinnerSizeControl();
 setupBotDifficultyControls();
-setupArenaTextureControls();
-setupTileTextureControls();
-setupBackdropTextureControls();
-setupCameraAndLightControls();
+setupLightControls();
 setupStartMenu();
 setupDeathmatchContinueButton();
 setupMobileControls();
@@ -716,6 +710,7 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   const group = new THREE.Group();
   group.name = options.name;
   group.position.copy(options.position);
+  group.scale.setScalar(spinnerSizeScale);
 
   const spinGroup = new THREE.Group();
   group.add(spinGroup);
@@ -839,7 +834,8 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
       originalMaterials: [],
     },
     forwardDirection: initialForward,
-    radius: options.radius,
+    baseRadius: options.radius,
+    radius: options.radius * spinnerSizeScale,
     spinSpeed: options.spinSpeed,
     pulseTimer: 0,
     currentRPM: absoluteMaxRPM,
@@ -985,7 +981,7 @@ function loadCustomSpinnerModel(): void {
     (source) => {
       spinnerModelSource = source;
       installCustomSpinnerModel(player, source.clone(true));
-      enemySpinnerInstancedModel.setModelSource(source, enemySpinners[0]?.radius ?? player.radius);
+      enemySpinnerInstancedModel.setModelSource(source, enemySpinners[0]?.baseRadius ?? player.baseRadius);
       for (const spinner of enemySpinners) {
         installInstancedEnemySpinnerModel(spinner);
       }
@@ -1026,7 +1022,7 @@ function installCustomSpinnerModel(spinner: SpinnerState, model: THREE.Group): v
   const center = box.getCenter(new THREE.Vector3());
   const diameter = Math.max(size.x, size.y);
   const height = size.z;
-  const scale = diameter > 0 ? (spinner.radius * 1.65) / diameter : 1;
+  const scale = diameter > 0 ? (spinner.baseRadius * 1.65) / diameter : 1;
 
   model.name = `${spinner.name} Custom Model`;
   model.position.sub(center);
@@ -1342,6 +1338,40 @@ function setupEnemyCountControl(): void {
   syncEnemyCount();
 }
 
+function setupSpinnerSizeControl(): void {
+  const input = document.querySelector<HTMLInputElement>("[data-spinner-size]");
+  const output = document.querySelector<HTMLOutputElement>("[data-spinner-size-value]");
+  if (!input) {
+    return;
+  }
+  restoreStoredInputValue(input, "spinnerSize");
+
+  const syncSpinnerSize = (): void => {
+    const value = clampTextureInputValue(input, Number(input.value));
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    input.value = String(value);
+    storeInputValue("spinnerSize", input.value);
+    if (output) {
+      output.value = value.toFixed(2);
+    }
+    applySpinnerSizeScale(value);
+  };
+
+  input.addEventListener("input", syncSpinnerSize);
+  syncSpinnerSize();
+}
+
+function applySpinnerSizeScale(scale: number): void {
+  spinnerSizeScale = scale;
+  for (const spinner of combatSpinners) {
+    spinner.radius = spinner.baseRadius * spinnerSizeScale;
+    spinner.group.scale.setScalar(spinnerSizeScale);
+  }
+}
+
 function setupStartMenu(): void {
   const menu = document.querySelector<HTMLElement>("[data-start-menu]");
   const startButton = document.querySelector<HTMLButtonElement>("[data-start-match]");
@@ -1422,6 +1452,14 @@ function applyMenuTranslations(): void {
     const key = element.dataset.i18n;
     if (key) {
       element.textContent = t(key as Parameters<typeof t>[0]);
+    }
+  }
+  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) {
+    const key = element.dataset.i18nAria;
+    if (key) {
+      const label = t(key as Parameters<typeof t>[0]);
+      element.setAttribute("aria-label", label);
+      element.title = label;
     }
   }
 }
@@ -1523,149 +1561,26 @@ function setupBotDifficultyControls(): void {
   applyDifficulty(botDifficulty);
 }
 
-function setupArenaTextureControls(): void {
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-arena-texture-setting]")) {
-    const setting = input.dataset.arenaTextureSetting;
-    if (!isArenaTextureSetting(setting)) {
-      continue;
+function setupLightControls(): void {
+  const panel = document.querySelector<HTMLElement>("[data-light-settings-panel]");
+  const toggle = document.querySelector<HTMLButtonElement>("[data-light-settings-toggle]");
+  const storedPanelHidden = localStorage.getItem(`${debugSettingStoragePrefix}light.panelHidden`);
+  let panelHidden = storedPanelHidden === "true";
+
+  const syncPanelVisibility = (): void => {
+    if (panel) {
+      panel.hidden = panelHidden;
     }
-
-    const numberInput = document.querySelector<HTMLInputElement>(`[data-arena-texture-value="${setting}"]`);
-    restoreStoredInputValue(input, `arenaTexture.${setting}`);
-    if (numberInput) {
-      numberInput.value = input.value;
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", String(!panelHidden));
     }
+    localStorage.setItem(`${debugSettingStoragePrefix}light.panelHidden`, String(panelHidden));
+  };
 
-    const syncTextureSetting = (): void => {
-      const value = clampTextureInputValue(input, Number(input.value));
-      if (!Number.isFinite(value)) {
-        return;
-      }
-
-      input.value = String(value);
-      if (numberInput) {
-        numberInput.value = String(value);
-      }
-      storeInputValue(`arenaTexture.${setting}`, input.value);
-      setArenaTextureSetting(setting, setting === "rotation" ? THREE.MathUtils.degToRad(value) : value);
-    };
-
-    input.addEventListener("input", syncTextureSetting);
-    numberInput?.addEventListener("input", () => {
-      input.value = numberInput.value;
-      syncTextureSetting();
-    });
-    syncTextureSetting();
-  }
-}
-
-function setupTileTextureControls(): void {
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-tile-texture-setting]")) {
-    const setting = input.dataset.tileTextureSetting;
-    if (!isTileTextureSetting(setting)) {
-      continue;
-    }
-
-    const numberInput = document.querySelector<HTMLInputElement>(`[data-tile-texture-value="${setting}"]`);
-    restoreStoredInputValue(input, `tileTexture.${setting}`);
-    if (numberInput) {
-      numberInput.value = input.value;
-    }
-
-    const syncTextureSetting = (): void => {
-      const value = clampTextureInputValue(input, Number(input.value));
-      if (!Number.isFinite(value)) {
-        return;
-      }
-
-      input.value = String(value);
-      if (numberInput) {
-        numberInput.value = String(value);
-      }
-      storeInputValue(`tileTexture.${setting}`, input.value);
-      setTileTextureSetting(setting, setting === "rotation" ? THREE.MathUtils.degToRad(value) : value);
-    };
-
-    input.addEventListener("input", syncTextureSetting);
-    numberInput?.addEventListener("input", () => {
-      input.value = numberInput.value;
-      syncTextureSetting();
-    });
-    syncTextureSetting();
-  }
-}
-
-function setupBackdropTextureControls(): void {
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-backdrop-texture-setting]")) {
-    const setting = input.dataset.backdropTextureSetting;
-    if (!isBackdropTextureSetting(setting)) {
-      continue;
-    }
-
-    const numberInput = document.querySelector<HTMLInputElement>(`[data-backdrop-texture-value="${setting}"]`);
-    restoreStoredInputValue(input, `backdropTexture.${setting}`);
-    if (numberInput) {
-      numberInput.value = input.value;
-    }
-
-    const syncTextureSetting = (): void => {
-      const value = clampTextureInputValue(input, Number(input.value));
-      if (!Number.isFinite(value)) {
-        return;
-      }
-
-      input.value = String(value);
-      if (numberInput) {
-        numberInput.value = String(value);
-      }
-      storeInputValue(`backdropTexture.${setting}`, input.value);
-      setBackdropTextureSetting(setting, setting === "rotation" ? THREE.MathUtils.degToRad(value) : value);
-    };
-
-    input.addEventListener("input", syncTextureSetting);
-    numberInput?.addEventListener("input", () => {
-      input.value = numberInput.value;
-      syncTextureSetting();
-    });
-    syncTextureSetting();
-  }
-}
-
-function setupCameraAndLightControls(): void {
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-camera-setting]")) {
-    const setting = input.dataset.cameraSetting;
-    if (!isCameraSetting(setting)) {
-      continue;
-    }
-
-    const numberInput = document.querySelector<HTMLInputElement>(`[data-camera-value="${setting}"]`);
-    restoreStoredInputValue(input, `camera.${setting}`);
-    if (numberInput) {
-      numberInput.value = input.value;
-    }
-
-    const syncCameraSetting = (): void => {
-      const value = clampTextureInputValue(input, Number(input.value));
-      if (!Number.isFinite(value)) {
-        return;
-      }
-
-      input.value = String(value);
-      if (numberInput) {
-        numberInput.value = String(value);
-      }
-      storeInputValue(`camera.${setting}`, input.value);
-      cameraSettings[setting] = value;
-      applyCameraSettings();
-    };
-
-    input.addEventListener("input", syncCameraSetting);
-    numberInput?.addEventListener("input", () => {
-      input.value = numberInput.value;
-      syncCameraSetting();
-    });
-    syncCameraSetting();
-  }
+  toggle?.addEventListener("click", () => {
+    panelHidden = !panelHidden;
+    syncPanelVisibility();
+  });
 
   for (const input of document.querySelectorAll<HTMLInputElement>("[data-light-setting]")) {
     const setting = input.dataset.lightSetting;
@@ -1716,16 +1631,8 @@ function setupCameraAndLightControls(): void {
     disableLightInput.addEventListener("change", syncLightDisabled);
     syncLightDisabled();
   }
-}
 
-function applyCameraSettings(): void {
-  defaultCameraPosition.set(cameraSettings.gameX, cameraSettings.gameY, cameraSettings.gameZ);
-  defaultCameraLookAt.set(cameraSettings.lookAtX, cameraSettings.lookAtY, cameraSettings.lookAtZ);
-  if (!deathCameraActive && !deathCameraReturning) {
-    camera.position.copy(defaultCameraPosition);
-    cameraLookAtTarget.copy(defaultCameraLookAt);
-    camera.lookAt(cameraLookAtTarget);
-  }
+  syncPanelVisibility();
 }
 
 function applyLightSettings(): void {
@@ -1734,22 +1641,6 @@ function applyLightSettings(): void {
   hemisphereLight.intensity = lightSettings.hemisphere * lightMultiplier;
   keyLight.intensity = lightSettings.key * lightMultiplier;
   fillLight.intensity = lightSettings.fill * lightMultiplier;
-}
-
-function isArenaTextureSetting(value: string | undefined): value is keyof ArenaTextureSettings {
-  return value === "offsetX" || value === "offsetY" || value === "scale" || value === "rotation";
-}
-
-function isTileTextureSetting(value: string | undefined): value is keyof TileTextureSettings {
-  return value === "offsetX" || value === "offsetY" || value === "scale" || value === "rotation";
-}
-
-function isBackdropTextureSetting(value: string | undefined): value is keyof BackdropTextureSettings {
-  return value === "offsetX" || value === "offsetY" || value === "scale" || value === "rotation";
-}
-
-function isCameraSetting(value: string | undefined): value is keyof typeof cameraSettings {
-  return typeof value === "string" && value in cameraSettings;
 }
 
 function isLightSetting(value: string | undefined): value is Exclude<keyof typeof lightSettings, "disabled"> {

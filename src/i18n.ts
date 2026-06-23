@@ -8,7 +8,15 @@ type TranslationKey =
   | "mode.unavailable"
   | "menu.settings"
   | "settings.enemies"
+  | "settings.spinnerSize"
   | "settings.botLevel"
+  | "settings.light"
+  | "settings.lightToggle"
+  | "settings.lightDisabled"
+  | "settings.lightAmbient"
+  | "settings.lightHemisphere"
+  | "settings.lightKey"
+  | "settings.lightFill"
   | "bot.easy"
   | "bot.normal"
   | "bot.hard"
@@ -38,7 +46,15 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Скоро",
     "menu.settings": "Настройки",
     "settings.enemies": "Боты",
+    "settings.spinnerSize": "Размер",
     "settings.botLevel": "Уровень ботов",
+    "settings.light": "Свет",
+    "settings.lightToggle": "Показать или скрыть настройки света",
+    "settings.lightDisabled": "Выключить свет",
+    "settings.lightAmbient": "Общий",
+    "settings.lightHemisphere": "Небо",
+    "settings.lightKey": "Ключ",
+    "settings.lightFill": "Заливка",
     "bot.easy": "Легко",
     "bot.normal": "Нормально",
     "bot.hard": "Сложно",
@@ -57,7 +73,15 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Soon",
     "menu.settings": "Settings",
     "settings.enemies": "Bots",
+    "settings.spinnerSize": "Size",
     "settings.botLevel": "Bot level",
+    "settings.light": "Light",
+    "settings.lightToggle": "Show or hide light settings",
+    "settings.lightDisabled": "Disable all light",
+    "settings.lightAmbient": "Ambient",
+    "settings.lightHemisphere": "Hemi",
+    "settings.lightKey": "Key",
+    "settings.lightFill": "Fill",
     "bot.easy": "Easy",
     "bot.normal": "Normal",
     "bot.hard": "Hard",
@@ -84,6 +108,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Yakında",
     "menu.settings": "Ayarlar",
     "settings.enemies": "Botlar",
+    "settings.spinnerSize": "Boyut",
     "settings.botLevel": "Bot seviyesi",
     "bot.easy": "Kolay",
     "bot.normal": "Normal",
@@ -103,6 +128,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Próximamente",
     "menu.settings": "Ajustes",
     "settings.enemies": "Bots",
+    "settings.spinnerSize": "Tamaño",
     "settings.botLevel": "Nivel de bots",
     "bot.easy": "Fácil",
     "bot.normal": "Normal",
@@ -122,6 +148,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Em breve",
     "menu.settings": "Configurações",
     "settings.enemies": "Bots",
+    "settings.spinnerSize": "Tamanho",
     "settings.botLevel": "Nível dos bots",
     "bot.easy": "Fácil",
     "bot.normal": "Normal",
@@ -141,6 +168,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "قريبًا",
     "menu.settings": "الإعدادات",
     "settings.enemies": "الروبوتات",
+    "settings.spinnerSize": "الحجم",
     "settings.botLevel": "مستوى الروبوتات",
     "bot.easy": "سهل",
     "bot.normal": "عادي",
@@ -160,6 +188,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Segera hadir",
     "menu.settings": "Pengaturan",
     "settings.enemies": "Bot",
+    "settings.spinnerSize": "Ukuran",
     "settings.botLevel": "Level bot",
     "bot.easy": "Mudah",
     "bot.normal": "Normal",
@@ -179,6 +208,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "जल्द आएगा",
     "menu.settings": "सेटिंग्स",
     "settings.enemies": "बॉट",
+    "settings.spinnerSize": "आकार",
     "settings.botLevel": "बॉट स्तर",
     "bot.easy": "आसान",
     "bot.normal": "सामान्य",
@@ -198,6 +228,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Sắp ra mắt",
     "menu.settings": "Cài đặt",
     "settings.enemies": "Bot",
+    "settings.spinnerSize": "Kích thước",
     "settings.botLevel": "Cấp bot",
     "bot.easy": "Dễ",
     "bot.normal": "Thường",
@@ -217,6 +248,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "即将推出",
     "menu.settings": "设置",
     "settings.enemies": "机器人",
+    "settings.spinnerSize": "大小",
     "settings.botLevel": "机器人等级",
     "bot.easy": "简单",
     "bot.normal": "普通",
@@ -236,6 +268,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Bald verfügbar",
     "menu.settings": "Einstellungen",
     "settings.enemies": "Bots",
+    "settings.spinnerSize": "Größe",
     "settings.botLevel": "Bot-Stufe",
     "bot.easy": "Einfach",
     "bot.normal": "Normal",
@@ -255,6 +288,7 @@ const translations: Record<LanguageCode, TranslationTable> = {
     "mode.unavailable": "Bientôt disponible",
     "menu.settings": "Paramètres",
     "settings.enemies": "Bots",
+    "settings.spinnerSize": "Taille",
     "settings.botLevel": "Niveau des bots",
     "bot.easy": "Facile",
     "bot.normal": "Normal",
