@@ -81,6 +81,8 @@ type ArcFrame = {
   glowGeometry: THREE.BufferGeometry;
 };
 
+type ArenaHeightSampler = (x: number, z: number) => number;
+
 const defaultConfig: TornadoVfxLayerConfig = {
   blendMode: "additive",
   color: "#ffd94a",
@@ -134,6 +136,11 @@ const defaultConfig: TornadoVfxLayerConfig = {
   sandSoftness: 0.42,
   sandParticleSize: 0.035,
 };
+
+const groundBasePositions = new WeakMap<THREE.BufferGeometry, Float32Array>();
+const groundProjectionInterval = 0.05;
+const idleGroundProjectionInterval = 0.25;
+const groundProjectionMoveThresholdSq = 0.0144;
 
 const defaultLayerConfigs: Record<TornadoVfxPart, TornadoVfxLayerConfig> = {
   tornado: { ...defaultConfig },
@@ -487,6 +494,8 @@ export class TornadoVfx {
   readonly group = new THREE.Group();
 
   private configs: Record<TornadoVfxPart, TornadoVfxLayerConfig>;
+  private readonly volumeGroup = new THREE.Group();
+  private readonly groundGroup = new THREE.Group();
   private readonly enabled: Record<TornadoVfxPart, boolean> = {
     tornado: true,
     shockwave: true,
@@ -518,6 +527,14 @@ export class TornadoVfx {
   private readonly debrisQuaternion = new THREE.Quaternion();
   private readonly debrisScale = new THREE.Vector3();
   private readonly debrisPosition = new THREE.Vector3();
+  private readonly groundProjectionWorldPoint = new THREE.Vector3();
+  private readonly groundProjectionLocalPoint = new THREE.Vector3();
+  private readonly groundProjectionInverseMatrix = new THREE.Matrix4();
+  private readonly groundProjectionOrigin = new THREE.Vector3();
+  private lastGroundProjectionTime = -Infinity;
+  private lastGroundProjectionX = 0;
+  private lastGroundProjectionZ = 0;
+  private groundProjectionDirty = true;
 
   constructor(preset?: TornadoVfxPreset) {
     this.configs = cloneLayerConfigs();
@@ -525,6 +542,9 @@ export class TornadoVfx {
       this.mergePreset(preset);
     }
     this.group.name = "TornadoVfx";
+    this.volumeGroup.name = "TornadoVfxVolume";
+    this.groundGroup.name = "TornadoVfxGround";
+    this.group.add(this.volumeGroup, this.groundGroup);
 
     const tornadoGeometry = new THREE.CylinderGeometry(1, 1, 1, 64, 48, true);
     tornadoGeometry.translate(0, 0.5, 0);
@@ -533,38 +553,39 @@ export class TornadoVfx {
     this.tornadoMesh = new THREE.Mesh(tornadoGeometry, this.tornadoMaterial);
     this.tornadoMesh.renderOrder = 6;
     this.tornadoMesh.frustumCulled = false;
-    this.group.add(this.tornadoMesh);
+    this.volumeGroup.add(this.tornadoMesh);
 
     this.gustMaterial = createGustMaterial(this.configs.gust);
     this.gustMesh = new THREE.Mesh(tornadoGeometry.clone(), this.gustMaterial);
     this.gustMesh.renderOrder = 5;
     this.gustMesh.frustumCulled = false;
-    this.group.add(this.gustMesh);
+    this.volumeGroup.add(this.gustMesh);
 
     this.shockwaveMaterial = createShockwaveMaterial(this.configs.shockwave);
     this.shockwaveMesh = new THREE.Mesh(new THREE.CircleGeometry(1.45, 64), this.shockwaveMaterial);
     this.shockwaveMesh.rotation.x = -Math.PI / 2;
     this.shockwaveMesh.position.y = 0.035;
     this.shockwaveMesh.renderOrder = 4;
-    this.group.add(this.shockwaveMesh);
+    this.shockwaveMesh.frustumCulled = false;
+    this.groundGroup.add(this.shockwaveMesh);
 
     this.dustMaterial = createGustMaterial(this.configs.dust);
     this.dustMesh = new THREE.Mesh(tornadoGeometry.clone(), this.dustMaterial);
     this.dustMesh.renderOrder = 3;
     this.dustMesh.frustumCulled = false;
-    this.group.add(this.dustMesh);
+    this.groundGroup.add(this.dustMesh);
 
     this.debrisMaterial = new THREE.MeshBasicMaterial({
       color: this.configs.debris.color,
       transparent: true,
       opacity: this.configs.debris.opacity,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: getBlendMode(this.configs.debris.blendMode),
     });
     this.debrisMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.045, 0.018, 0.08), this.debrisMaterial, 240);
     this.debrisMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.debrisMesh.renderOrder = 7;
-    this.group.add(this.debrisMesh);
+    this.volumeGroup.add(this.debrisMesh);
 
     this.arcCoreMaterial = new THREE.MeshBasicMaterial({
       color: this.configs.arcs.color,
@@ -573,6 +594,7 @@ export class TornadoVfx {
       depthTest: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      blending: getBlendMode(this.configs.arcs.blendMode),
     });
     this.arcGlowMaterial = new THREE.MeshBasicMaterial({
       color: this.configs.arcs.accentColor,
@@ -581,7 +603,7 @@ export class TornadoVfx {
       depthTest: true,
       depthWrite: false,
       side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
+      blending: getBlendMode(this.configs.arcs.blendMode),
     });
     this.arcCoreMesh = new THREE.Mesh(new THREE.BufferGeometry(), this.arcCoreMaterial);
     this.arcGlowMesh = new THREE.Mesh(new THREE.BufferGeometry(), this.arcGlowMaterial);
@@ -591,7 +613,7 @@ export class TornadoVfx {
     this.arcGlowMesh.renderOrder = 9;
     this.arcCoreMesh.frustumCulled = false;
     this.arcGlowMesh.frustumCulled = false;
-    this.group.add(this.arcCoreMesh, this.arcGlowMesh);
+    this.volumeGroup.add(this.arcCoreMesh, this.arcGlowMesh);
 
     this.rebuildDebris();
     this.rebuildArcs();
@@ -624,12 +646,48 @@ export class TornadoVfx {
     this.updateArcs(deltaTime, elapsedTime);
   }
 
+  projectGroundToSurface(heightAt: ArenaHeightSampler, surfaceOffset: number, elapsedTime: number): void {
+    this.groundGroup.position.y = 0;
+    this.group.updateWorldMatrix(true, true);
+    this.groundProjectionOrigin.setFromMatrixPosition(this.group.matrixWorld);
+    const dx = this.groundProjectionOrigin.x - this.lastGroundProjectionX;
+    const dz = this.groundProjectionOrigin.z - this.lastGroundProjectionZ;
+    const movedEnough = dx * dx + dz * dz >= groundProjectionMoveThresholdSq;
+    const elapsedSinceProjection = elapsedTime - this.lastGroundProjectionTime;
+    if (!this.groundProjectionDirty) {
+      if (elapsedSinceProjection < groundProjectionInterval) {
+        return;
+      }
+      if (!movedEnough && elapsedSinceProjection < idleGroundProjectionInterval) {
+        return;
+      }
+    }
+
+    this.lastGroundProjectionTime = elapsedTime;
+    this.lastGroundProjectionX = this.groundProjectionOrigin.x;
+    this.lastGroundProjectionZ = this.groundProjectionOrigin.z;
+    this.groundProjectionDirty = false;
+    const originY = this.groundProjectionOrigin.y;
+
+    if (this.enabled.shockwave) {
+      this.projectGroundMeshToSurface(this.shockwaveMesh, heightAt, surfaceOffset, originY);
+    }
+    if (this.enabled.dust) {
+      this.projectGroundMeshToSurface(this.dustMesh, heightAt, surfaceOffset, originY);
+    }
+    if (this.enabled.arcs && isGroundArcConfig(this.configs.arcs)) {
+      this.projectGroundMeshToSurface(this.arcCoreMesh, heightAt, surfaceOffset, originY);
+      this.projectGroundMeshToSurface(this.arcGlowMesh, heightAt, surfaceOffset, originY);
+    }
+  }
+
   applyPreset(preset: TornadoVfxPreset): void {
     this.configs = cloneLayerConfigs();
     this.resetEnabled();
     this.mergePreset(preset);
     this.rebuildDebris();
     this.rebuildArcs();
+    this.groundProjectionDirty = true;
     this.applyAllConfigs();
   }
 
@@ -779,6 +837,7 @@ export class TornadoVfx {
     this.arcCoreMesh.geometry = frame.coreGeometry;
     this.arcGlowMesh.geometry = frame.glowGeometry;
     this.arcFrameIndex = frameIndex;
+    this.groundProjectionDirty = true;
   }
 
   private createArcPath(
@@ -879,20 +938,69 @@ export class TornadoVfx {
       this.shockwaveMaterial.uniforms.ringWidth.value = config.ringWidth;
       this.shockwaveMaterial.uniforms.edgeFade.value = config.edgeFade;
       this.shockwaveMesh.scale.setScalar(config.topWidth);
+      this.groundProjectionDirty = true;
     } else if (part === "dust") {
       applyCommonUniforms(this.dustMaterial, config, color);
+      this.groundProjectionDirty = true;
     } else if (part === "debris") {
       this.debrisMaterial.color.copy(color);
       this.debrisMaterial.opacity = config.opacity;
+      applyMaterialBlendMode(this.debrisMaterial, config);
     } else if (part === "arcs") {
+      this.updateArcParent();
       this.arcCoreMaterial.color.copy(color);
       this.arcCoreMaterial.opacity = config.opacity;
-      this.arcCoreMaterial.blending = getBlendMode(config.blendMode);
+      applyMaterialBlendMode(this.arcCoreMaterial, config);
       this.arcGlowMaterial.color.set(config.accentColor);
       this.arcGlowMaterial.opacity = config.opacity * config.glowStrength * 0.34;
-      this.arcGlowMaterial.blending = getBlendMode(config.blendMode);
+      applyMaterialBlendMode(this.arcGlowMaterial, config);
+      this.groundProjectionDirty = true;
     }
     this.applyVisibility();
+  }
+
+  private updateArcParent(): void {
+    const targetParent = isGroundArcConfig(this.configs.arcs) ? this.groundGroup : this.volumeGroup;
+    if (this.arcCoreMesh.parent !== targetParent) {
+      targetParent.add(this.arcCoreMesh);
+    }
+    if (this.arcGlowMesh.parent !== targetParent) {
+      targetParent.add(this.arcGlowMesh);
+    }
+  }
+
+  private projectGroundMeshToSurface(
+    mesh: THREE.Mesh,
+    heightAt: ArenaHeightSampler,
+    surfaceOffset: number,
+    originY: number,
+  ): void {
+    const position = mesh.geometry.getAttribute("position");
+    if (!(position instanceof THREE.BufferAttribute)) {
+      return;
+    }
+
+    const basePositions = getGroundBasePositions(mesh.geometry, position);
+    const positions = position.array;
+    mesh.updateWorldMatrix(true, false);
+    this.groundProjectionInverseMatrix.copy(mesh.matrixWorld).invert();
+
+    for (let i = 0; i < positions.length; i += 3) {
+      this.groundProjectionWorldPoint
+        .set(basePositions[i], basePositions[i + 1], basePositions[i + 2])
+        .applyMatrix4(mesh.matrixWorld);
+      const localHeightOffset = this.groundProjectionWorldPoint.y - originY;
+      this.groundProjectionWorldPoint.y = heightAt(
+        this.groundProjectionWorldPoint.x,
+        this.groundProjectionWorldPoint.z,
+      ) + surfaceOffset + localHeightOffset;
+      this.groundProjectionLocalPoint.copy(this.groundProjectionWorldPoint).applyMatrix4(this.groundProjectionInverseMatrix);
+      positions[i] = this.groundProjectionLocalPoint.x;
+      positions[i + 1] = this.groundProjectionLocalPoint.y;
+      positions[i + 2] = this.groundProjectionLocalPoint.z;
+    }
+
+    position.needsUpdate = true;
   }
 
   private applyVisibility(): void {
@@ -904,6 +1012,22 @@ export class TornadoVfx {
     this.arcCoreMesh.visible = this.enabled.arcs && this.arcFrames.length > 0;
     this.arcGlowMesh.visible = this.enabled.arcs && this.configs.arcs.glowStrength > 0 && this.arcFrames.length > 0;
   }
+}
+
+function isGroundArcConfig(config: TornadoVfxLayerConfig): boolean {
+  return config.height <= 0.02;
+}
+
+function getGroundBasePositions(geometry: THREE.BufferGeometry, position: THREE.BufferAttribute): Float32Array {
+  const existing = groundBasePositions.get(geometry);
+  if (existing) {
+    return existing;
+  }
+
+  const source = position.array;
+  const basePositions = source instanceof Float32Array ? new Float32Array(source) : Float32Array.from(source);
+  groundBasePositions.set(geometry, basePositions);
+  return basePositions;
 }
 
 function getBlendMode(blendMode: TornadoVfxLayerConfig["blendMode"]): THREE.Blending {
@@ -1042,7 +1166,7 @@ function createTornadoMaterial(config: TornadoVfxConfig): THREE.ShaderMaterial {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: getBlendMode(config.blendMode),
   });
 }
 
@@ -1054,7 +1178,7 @@ function createGustMaterial(config: TornadoVfxConfig): THREE.ShaderMaterial {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: getBlendMode(config.blendMode),
   });
 }
 
@@ -1066,7 +1190,7 @@ function createShockwaveMaterial(config: TornadoVfxConfig): THREE.ShaderMaterial
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: getBlendMode(config.blendMode),
   });
 }
 
@@ -1102,6 +1226,7 @@ function applyCommonUniforms(
   config: TornadoVfxConfig,
   color: THREE.Color,
 ): void {
+  applyMaterialBlendMode(material, config);
   material.uniforms.color.value.copy(color);
   material.uniforms.accentColor.value.set(config.accentColor);
   material.uniforms.rimColor.value.set(config.rimColor);
@@ -1120,6 +1245,14 @@ function applyCommonUniforms(
   material.uniforms.waveStrength.value = config.waveStrength;
   material.uniforms.displaceStrength.value = config.displaceStrength;
   material.uniforms.edgeSoftness.value = config.edgeSoftness;
+}
+
+function applyMaterialBlendMode(material: THREE.Material, config: TornadoVfxConfig): void {
+  const blending = getBlendMode(config.blendMode);
+  if (material.blending !== blending) {
+    material.blending = blending;
+    material.needsUpdate = true;
+  }
 }
 
 function cloneLayerConfigs(

@@ -386,7 +386,7 @@ const botDifficultyPresets: Record<
   hard: { minDecisionTime: 0.2, maxDecisionTime: 0.35, cursorAngularSpeed: Math.PI * 1.55, cursorRadialSpeed: 10 },
 };
 const debugSettingStoragePrefix = "turbo-spin-arena.debug.";
-let spinnerSizeScale = 1;
+let spinnerSizeScale = getStoredDebugNumber("spinnerSize", 0.6, 3, 1);
 
 const maxTrailPoints = 28;
 const maxTrailRibbonPoints = (maxTrailPoints + 1) * 2;
@@ -396,6 +396,7 @@ const spinnerModelUrl = `${import.meta.env.BASE_URL}assets/Spiner.obj`;
 const damageNumberFontUrl = `${import.meta.env.BASE_URL}assets/fonts/ZeroCool.woff2`;
 const damageNumberFontFamily = "ZeroCoolDamage";
 const maxRendererPixelRatio = 1.25;
+const auraGroundPlaneOffset = 0.06;
 const cameraLookAtTarget = new THREE.Vector3(0, 0, 0);
 const airborneGravity = -18;
 const cameraSettings = {
@@ -624,6 +625,7 @@ function updateCritReadyVfx(deltaTime: number): void {
     spinner.critReadyVfx.group.visible = ready;
     if (ready) {
       spinner.critReadyVfx.update(deltaTime, elapsedTime);
+      projectAuraGroundToArena(spinner.critReadyVfx);
     }
   }
 }
@@ -638,6 +640,7 @@ function updateUltimateVfx(deltaTime: number): void {
     spinner.ultimateVfx.group.visible = active;
     if (active) {
       spinner.ultimateVfx.update(deltaTime, elapsedTime);
+      projectAuraGroundToArena(spinner.ultimateVfx);
     }
   }
 }
@@ -662,6 +665,7 @@ function updateBonusAuraVfx(deltaTime: number): void {
         }
         updateBonusAuraIntro(spinner, type, deltaTime);
         bonusAuraVfx.update(deltaTime, elapsedTime);
+        projectAuraGroundToArena(bonusAuraVfx);
       } else {
         spinner.bonusAuraIntroByType[type] = 0;
         bonusAuraVfx.group.scale.setScalar(1);
@@ -684,6 +688,14 @@ function updateBonusAuraIntro(spinner: SpinnerState, type: TimedArenaBonusType, 
   const heightScale = THREE.MathUtils.lerp(3.0, 1, eased);
   const widthScale = THREE.MathUtils.lerp(1.25, 1, eased);
   spinner.bonusAuraVfxByType[type].group.scale.set(widthScale, heightScale, widthScale);
+}
+
+function projectAuraGroundToArena(vfx: TornadoVfx): void {
+  vfx.projectGroundToSurface(sampleActiveArenaHeight, auraGroundPlaneOffset, elapsedTime);
+}
+
+function sampleActiveArenaHeight(x: number, z: number): number {
+  return activeArena.getHeightAt(x, z);
 }
 
 function updateHudSystems(): void {
@@ -1344,6 +1356,7 @@ function setupSpinnerSizeControl(): void {
   if (!input) {
     return;
   }
+  input.value = String(spinnerSizeScale);
   restoreStoredInputValue(input, "spinnerSize");
 
   const syncSpinnerSize = (): void => {
@@ -1675,6 +1688,20 @@ function restoreStoredInputValue(input: HTMLInputElement, key: string | undefine
   const min = input.min === "" ? -Infinity : Number(input.min);
   const max = input.max === "" ? Infinity : Number(input.max);
   input.value = String(THREE.MathUtils.clamp(value, min, max));
+}
+
+function getStoredDebugNumber(key: string, min: number, max: number, fallback: number): number {
+  const storedValue = localStorage.getItem(`${debugSettingStoragePrefix}${key}`);
+  if (storedValue === null) {
+    return fallback;
+  }
+
+  const value = Number(storedValue);
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return THREE.MathUtils.clamp(value, min, max);
 }
 
 function storeInputValue(key: string | undefined, value: string): void {
@@ -2569,6 +2596,7 @@ function updateHealAuraBursts(deltaTime: number): void {
     const widthScale = THREE.MathUtils.lerp(1.25, 0.55, easeOutCubic(ratio));
     burst.vfx.group.scale.set(widthScale, heightScale, widthScale);
     burst.vfx.update(deltaTime, elapsedTime);
+    projectAuraGroundToArena(burst.vfx);
 
     if (ratio >= 1) {
       burst.parent.remove(burst.vfx.group);
