@@ -1,24 +1,15 @@
 import * as THREE from "three";
 import type { ArenaBonus, ArenaBonusType } from "../simulation/arenaBonuses";
+import { StylizedOrbVfxPool, type StylizedOrbVfx } from "./stylizedOrbVfx";
 
 export type ArenaBonusVfxType = ArenaBonusType | "heal";
 
 type BonusPalette = Record<ArenaBonusVfxType, string>;
 
-type PickupPhase = "active" | "collect" | "fade";
-
 type BonusPickupVisual = {
   id: number;
   type: ArenaBonusVfxType;
-  group: THREE.Group;
-  core: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
-  coreMaterial: THREE.MeshStandardMaterial;
-  halo: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
-  haloMaterial: THREE.MeshBasicMaterial;
-  basePosition: THREE.Vector3;
-  phase: PickupPhase;
-  phaseTime: number;
-  spawnTime: number;
+  orb: StylizedOrbVfx;
 };
 
 type BonusParticleKind = "radial" | "stream" | "shard";
@@ -47,37 +38,32 @@ type BonusPulse = {
 };
 
 const hiddenPosition = new THREE.Vector3(0, -40, 0);
-const fadeInDuration = 0.18;
-const collectDuration = 0.42;
-const quietFadeDuration = 0.24;
 const maxBonusParticles = 160;
 const maxBonusPulses = 36;
 
 export class BonusVfxPool {
   private readonly activePickups = new Map<number, BonusPickupVisual>();
-  private readonly idlePickups: BonusPickupVisual[] = [];
+  private readonly orbPool = new StylizedOrbVfxPool({ size: 5 });
   private readonly activeParticles: BonusParticle[] = [];
   private readonly idleParticles: BonusParticle[] = [];
   private readonly activePulses: BonusPulse[] = [];
   private readonly idlePulses: BonusPulse[] = [];
-  private readonly coreGeometry = new THREE.OctahedronGeometry(0.34, 1);
-  private readonly haloGeometry = createIrregularRingGeometry(41, 0.48, 0.038, 0.42);
   private readonly flashGeometry = new THREE.SphereGeometry(1, 18, 10);
   private readonly ringGeometries = createIrregularRingGeometries();
   private readonly radialParticleGeometry = new THREE.SphereGeometry(0.045, 8, 6);
   private readonly streamParticleGeometry = new THREE.SphereGeometry(0.038, 8, 6);
   private readonly shardGeometry = new THREE.BoxGeometry(0.09, 0.026, 0.09);
+  private readonly pickupPosition = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly palette: BonusPalette,
     private readonly reducedMotionQuery: MediaQueryList,
-  ) {}
+  ) {
+    scene.add(this.orbPool.group);
+  }
 
-  prewarm(options: { pickups: number; particles: number; pulses: number }): void {
-    for (let i = this.idlePickups.length; i < options.pickups; i += 1) {
-      this.idlePickups.push(this.createPickupVisual());
-    }
+  prewarm(options: { particles: number; pulses: number }): void {
     for (let i = this.idleParticles.length; i < options.particles; i += 1) {
       this.idleParticles.push(this.createParticle("radial"));
     }
@@ -86,29 +72,30 @@ export class BonusVfxPool {
     }
   }
 
-  syncActivePickups(activeBonuses: ArenaBonus[], deltaTime: number, elapsedTime: number): void {
+  syncActivePickups(activeBonuses: ArenaBonus[], _deltaTime: number, _elapsedTime: number): void {
     const activeIds = new Set(activeBonuses.map((bonus) => bonus.id));
     for (const bonus of activeBonuses) {
       const visual = this.acquirePickup(bonus);
-      this.updateActivePickup(visual, deltaTime, elapsedTime);
+      if (visual) {
+        this.updateActivePickup(visual, bonus);
+      }
     }
 
     for (const [id, visual] of this.activePickups) {
-      if (activeIds.has(id) || visual.phase === "collect") {
+      if (activeIds.has(id)) {
         continue;
       }
-      if (visual.phase !== "fade") {
-        visual.phase = "fade";
-        visual.phaseTime = 0;
-      }
+      this.releasePickup(visual);
+      this.activePickups.delete(id);
     }
   }
 
   startCollectEffect(bonus: ArenaBonus): void {
-    const visual = this.acquirePickup(bonus);
-    visual.phase = "collect";
-    visual.phaseTime = 0;
-    visual.group.visible = true;
+    const visual = this.activePickups.get(bonus.id);
+    if (visual) {
+      this.releasePickup(visual);
+      this.activePickups.delete(bonus.id);
+    }
     this.spawnCollectBurst(bonus.position, bonus.type);
   }
 
@@ -118,29 +105,15 @@ export class BonusVfxPool {
   }
 
   update(deltaTime: number, elapsedTime: number): void {
-    for (const [id, visual] of this.activePickups) {
-      if (visual.phase === "collect") {
-        this.updateCollectPickup(visual, deltaTime);
-      } else if (visual.phase === "fade") {
-        this.updateFadePickup(visual, deltaTime);
-      }
-
-      if (visual.phase !== "active" && !visual.group.visible) {
-        this.activePickups.delete(id);
-        this.releasePickup(visual);
-      }
-    }
-
+    this.orbPool.update(deltaTime, elapsedTime);
     this.updateParticles(deltaTime, elapsedTime);
     this.updatePulses(deltaTime);
   }
 
   dispose(): void {
-    for (const visual of [...this.activePickups.values(), ...this.idlePickups]) {
-      this.scene.remove(visual.group);
-      visual.coreMaterial.dispose();
-      visual.haloMaterial.dispose();
-    }
+    this.activePickups.clear();
+    this.scene.remove(this.orbPool.group);
+    this.orbPool.dispose();
     for (const particle of [...this.activeParticles, ...this.idleParticles]) {
       this.scene.remove(particle.mesh);
       particle.material.dispose();
@@ -149,8 +122,6 @@ export class BonusVfxPool {
       this.scene.remove(pulse.mesh);
       pulse.material.dispose();
     }
-    this.coreGeometry.dispose();
-    this.haloGeometry.dispose();
     this.flashGeometry.dispose();
     for (const geometry of this.ringGeometries) {
       geometry.dispose();
@@ -160,133 +131,35 @@ export class BonusVfxPool {
     this.shardGeometry.dispose();
   }
 
-  private acquirePickup(bonus: ArenaBonus): BonusPickupVisual {
+  private acquirePickup(bonus: ArenaBonus): BonusPickupVisual | null {
     const existing = this.activePickups.get(bonus.id);
     if (existing) {
-      existing.basePosition.copy(bonus.position);
       return existing;
     }
 
-    const visual = this.idlePickups.pop() ?? this.createPickupVisual();
-    visual.id = bonus.id;
-    visual.type = bonus.type;
-    visual.basePosition.copy(bonus.position);
-    visual.phase = "active";
-    visual.phaseTime = 0;
-    visual.spawnTime = 0;
-    visual.group.visible = true;
-    visual.group.position.copy(bonus.position).add(new THREE.Vector3(0, 0.72, 0));
-    visual.group.scale.setScalar(0.72);
-    this.applyPickupColor(visual, bonus.type);
+    this.pickupPosition.copy(bonus.position);
+    this.pickupPosition.y += 0.72;
+    const orb = this.orbPool.acquire(this.pickupPosition, this.palette[bonus.type]);
+    if (!orb) {
+      return null;
+    }
+    const visual: BonusPickupVisual = { id: bonus.id, type: bonus.type, orb };
     this.activePickups.set(bonus.id, visual);
     return visual;
   }
 
-  private createPickupVisual(): BonusPickupVisual {
-    const group = new THREE.Group();
-    group.visible = false;
-    group.position.copy(hiddenPosition);
-
-    const coreMaterial = new THREE.MeshStandardMaterial({
-      color: "#ffffff",
-      emissive: "#ffffff",
-      emissiveIntensity: 0.8,
-      roughness: 0.38,
-      metalness: 0.08,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    const core = new THREE.Mesh(this.coreGeometry, coreMaterial);
-    group.add(core);
-
-    const haloMaterial = this.createAdditiveMaterial("#ffffff", 0);
-    const halo = new THREE.Mesh(this.haloGeometry, haloMaterial);
-    halo.rotation.x = Math.PI / 2;
-    group.add(halo);
-
-    this.scene.add(group);
-    return {
-      id: -1,
-      type: "speed",
-      group,
-      core,
-      coreMaterial,
-      halo,
-      haloMaterial,
-      basePosition: new THREE.Vector3(),
-      phase: "active",
-      phaseTime: 0,
-      spawnTime: 0,
-    };
-  }
-
-  private updateActivePickup(visual: BonusPickupVisual, deltaTime: number, elapsedTime: number): void {
-    if (visual.phase !== "active") {
-      return;
-    }
-
-    visual.spawnTime = Math.min(fadeInDuration, visual.spawnTime + deltaTime);
-    const fade = easeOutCubic(visual.spawnTime / fadeInDuration);
-    const pulse = 1 + Math.sin(elapsedTime * 6 + visual.id) * 0.08;
-    const bob = Math.sin(elapsedTime * 2.6 + visual.id * 0.73) * 0.08;
-    visual.group.position.copy(visual.basePosition).add(new THREE.Vector3(0, 0.72 + bob, 0));
-    visual.group.rotation.y += deltaTime * 1.8;
-    visual.group.scale.setScalar(THREE.MathUtils.lerp(0.72, 1, fade));
-    visual.core.scale.setScalar(pulse);
-    visual.coreMaterial.opacity = fade;
-    visual.halo.scale.setScalar(1 + Math.sin(elapsedTime * 4.5 + visual.id) * 0.12);
-    visual.halo.rotation.z -= deltaTime * 2.2;
-    visual.haloMaterial.opacity = (0.2 + Math.sin(elapsedTime * 5 + visual.id) * 0.08) * fade;
-  }
-
-  private updateCollectPickup(visual: BonusPickupVisual, deltaTime: number): void {
-    visual.phaseTime += deltaTime;
-    const t = THREE.MathUtils.clamp(visual.phaseTime / collectDuration, 0, 1);
-    const grow = easeOutCubic(t);
-    const alpha = 1 - easeInCubic(t);
-    visual.group.position.copy(visual.basePosition).add(new THREE.Vector3(0, 0.72 + t * 0.42, 0));
-    visual.group.scale.setScalar(1);
-    visual.group.rotation.y += deltaTime * 5.2;
-    visual.core.scale.setScalar(THREE.MathUtils.lerp(1, 2.3, grow));
-    visual.coreMaterial.opacity = alpha;
-    visual.halo.scale.setScalar(THREE.MathUtils.lerp(1, 2.05, grow));
-    visual.haloMaterial.opacity = 0.2 * ((1 - t) ** 2.4) * (1 - grow * 0.45);
-
-    if (t >= 1) {
-      visual.group.visible = false;
-    }
-  }
-
-  private updateFadePickup(visual: BonusPickupVisual, deltaTime: number): void {
-    visual.phaseTime += deltaTime;
-    const t = THREE.MathUtils.clamp(visual.phaseTime / quietFadeDuration, 0, 1);
-    const alpha = 1 - t;
-    visual.group.scale.setScalar(THREE.MathUtils.lerp(1, 0.72, t));
-    visual.coreMaterial.opacity = alpha;
-    visual.haloMaterial.opacity = 0.22 * alpha;
-    if (t >= 1) {
-      visual.group.visible = false;
+  private updateActivePickup(visual: BonusPickupVisual, bonus: ArenaBonus): void {
+    this.pickupPosition.copy(bonus.position);
+    this.pickupPosition.y += 0.72;
+    visual.orb.setPosition(this.pickupPosition);
+    if (visual.type !== bonus.type) {
+      visual.type = bonus.type;
+      visual.orb.setColor(this.palette[bonus.type]);
     }
   }
 
   private releasePickup(visual: BonusPickupVisual): void {
-    visual.group.position.copy(hiddenPosition);
-    visual.group.scale.setScalar(1);
-    visual.core.scale.setScalar(1);
-    visual.halo.scale.setScalar(1);
-    visual.coreMaterial.opacity = 0;
-    visual.haloMaterial.opacity = 0;
-    visual.id = -1;
-    this.idlePickups.push(visual);
-  }
-
-  private applyPickupColor(visual: BonusPickupVisual, type: ArenaBonusVfxType): void {
-    const color = this.palette[type];
-    visual.coreMaterial.color.set(color);
-    visual.coreMaterial.emissive.set(color);
-    visual.coreMaterial.emissiveIntensity = type === "heal" ? 0.55 : 0.8;
-    visual.haloMaterial.color.set(color);
+    this.orbPool.release(visual.orb);
   }
 
   private spawnCollectBurst(position: THREE.Vector3, type: ArenaBonusVfxType): void {

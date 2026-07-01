@@ -621,7 +621,7 @@
 
       .rpm-hud {
         position: fixed;
-        bottom: 18px;
+        top: calc(env(safe-area-inset-top, 0px) + 42px);
         z-index: 2;
         display: flex;
         flex-direction: column;
@@ -632,12 +632,12 @@
       }
 
       .rpm-hud.player {
-        left: 18px;
+        left: calc(env(safe-area-inset-left, 0px) + 18px);
       }
 
       .rpm-hud.enemies {
-        right: 18px;
-        flex-direction: column-reverse;
+        top: calc(env(safe-area-inset-top, 0px) + 92px);
+        right: calc(env(safe-area-inset-right, 0px) + 18px);
       }
 
       .settings-panel {
@@ -911,7 +911,10 @@
         display: none;
         justify-content: space-between;
         align-items: flex-end;
-        padding: 0 18px 18px;
+        padding:
+          0 calc(env(safe-area-inset-right, 0px) + 18px)
+          calc(env(safe-area-inset-bottom, 0px) + 18px)
+          calc(env(safe-area-inset-left, 0px) + 18px);
         pointer-events: none;
       }
 
@@ -925,8 +928,8 @@
 
       .mobile-joystick {
         position: relative;
-        width: 118px;
-        height: 118px;
+        width: clamp(104px, 18vmin, 144px);
+        height: clamp(104px, 18vmin, 144px);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 999px;
         background:
@@ -943,8 +946,8 @@
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 54px;
-        height: 54px;
+        width: clamp(48px, 8vmin, 66px);
+        height: clamp(48px, 8vmin, 66px);
         border-radius: 999px;
         background: linear-gradient(145deg, #ffffff, #9bd9ff);
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35), 0 0 18px rgba(77, 172, 255, 0.38);
@@ -954,18 +957,18 @@
       .mobile-action-buttons {
         display: flex;
         align-items: flex-end;
-        gap: 12px;
+        gap: clamp(10px, 1.8vmin, 16px);
         pointer-events: none;
       }
 
       .mobile-action-button {
-        width: 72px;
-        height: 72px;
+        width: clamp(74px, 12vmin, 92px);
+        height: clamp(74px, 12vmin, 92px);
         border: 1px solid rgba(255, 255, 255, 0.22);
         border-radius: 999px;
         color: #ffffff;
         font-family: "ZeroCool", Impact, "Arial Black", sans-serif;
-        font-size: 20px;
+        font-size: clamp(13px, 2.5vmin, 20px);
         line-height: 1;
         letter-spacing: 0;
         text-transform: uppercase;
@@ -1043,16 +1046,15 @@
         }
 
         .rpm-hud {
-          bottom: 12px;
           width: min(190px, calc(50vw - 18px));
         }
 
         .rpm-hud.player {
-          left: 10px;
+          left: calc(env(safe-area-inset-left, 0px) + 10px);
         }
 
         .rpm-hud.enemies {
-          right: 10px;
+          right: calc(env(safe-area-inset-right, 0px) + 10px);
         }
 
         .bonus-icons {
@@ -1151,8 +1153,11 @@
         }
 
         .rpm-hud {
-          bottom: 10px;
           width: min(210px, calc(50vw - 24px));
+        }
+
+        .rpm-hud.enemies {
+          top: calc(env(safe-area-inset-top, 0px) + 64px);
         }
 
         .rpm-card {
@@ -1160,23 +1165,10 @@
         }
 
         .mobile-controls {
-          padding: 0 14px 10px;
-        }
-
-        .mobile-joystick {
-          width: 88px;
-          height: 88px;
-        }
-
-        .mobile-joystick-thumb {
-          width: 40px;
-          height: 40px;
-        }
-
-        .mobile-action-button {
-          width: 58px;
-          height: 58px;
-          font-size: 15px;
+          padding:
+            0 calc(env(safe-area-inset-right, 0px) + 14px)
+            calc(env(safe-area-inset-bottom, 0px) + 10px)
+            calc(env(safe-area-inset-left, 0px) + 14px);
         }
 
         .light-settings-toggle {

@@ -15,6 +15,12 @@ export type CombatSpinnerState = {
   critSpeedEase?: number;
   critDamageMultiplier?: number;
   damageMultiplier?: number;
+  incomingDamageMultiplier?: number;
+  collisionDamageMultiplier?: number;
+  collisionKnockbackMultiplier?: number;
+  elementalMoveSpeedMultiplier?: number;
+  elementalMovementLocked?: boolean;
+  verticalLaunchActive?: boolean;
 };
 
 export type CombatImpact = {
@@ -53,6 +59,13 @@ export type CombatDamageEvent<TSpinner extends CombatSpinnerState = CombatSpinne
   target: TSpinner;
   amount: number;
   critical: boolean;
+  position: THREE.Vector3;
+  direction: THREE.Vector3;
+};
+
+export type DirectDamageResult<TSpinner extends CombatSpinnerState = CombatSpinnerState> = {
+  damageEvent: CombatDamageEvent<TSpinner> | null;
+  damageNumber: CombatDamageNumberCommand<TSpinner> | null;
 };
 
 export type CombatCollisionResult<TSpinner extends CombatSpinnerState = CombatSpinnerState> = {
@@ -170,6 +183,10 @@ function handleSpinnerCollisionPair<TSpinner extends CombatSpinnerState>(
   damageEvents: CombatDamageEvent<TSpinner>[],
   elapsedTime: number,
 ): void {
+  if (a.spinner.verticalLaunchActive || b.spinner.verticalLaunchActive) {
+    return;
+  }
+
   const offset = new THREE.Vector3().subVectors(b.position, a.position);
   offset.y = 0;
   const distance = offset.length();
@@ -180,8 +197,16 @@ function handleSpinnerCollisionPair<TSpinner extends CombatSpinnerState>(
 
   const normal = distance > 0.001 ? offset.divideScalar(distance) : new THREE.Vector3(1, 0, 0);
   const penetration = minDistance - distance;
-  a.spinner.group.position.addScaledVector(normal, -penetration * 0.5);
-  b.spinner.group.position.addScaledVector(normal, penetration * 0.5);
+  const aLocked = a.spinner.elementalMovementLocked === true;
+  const bLocked = b.spinner.elementalMovementLocked === true;
+  if (aLocked && !bLocked) {
+    b.spinner.group.position.addScaledVector(normal, penetration);
+  } else if (!aLocked && bLocked) {
+    a.spinner.group.position.addScaledVector(normal, -penetration);
+  } else if (!aLocked && !bLocked) {
+    a.spinner.group.position.addScaledVector(normal, -penetration * 0.5);
+    b.spinner.group.position.addScaledVector(normal, penetration * 0.5);
+  }
 
   const relativeVelocity = new THREE.Vector3().subVectors(a.velocity, b.velocity);
   const impactSpeed = Math.max(0, relativeVelocity.dot(normal));
@@ -194,6 +219,7 @@ function handleSpinnerCollisionPair<TSpinner extends CombatSpinnerState>(
   const canApplyDamage = impactSpeed >= minImpactSpeedForDamage && elapsedTime - lastImpactTime >= impactDamageCooldown;
   const aZone = getContactZone(a.forwardDirection, normal);
   const bZone = getContactZone(b.forwardDirection, normal.clone().multiplyScalar(-1));
+  const impactPosition = a.position.clone().add(b.position).multiplyScalar(0.5);
   let damage: CollisionDamage = { damageToA: 0, damageToB: 0, aCritsB: false, bCritsA: false };
   let showImpactFeedback = false;
 
@@ -202,8 +228,16 @@ function handleSpinnerCollisionPair<TSpinner extends CombatSpinnerState>(
 
     addDamage(damageBySpinner, a.spinner, damage.damageToA, damage.damageToB);
     addDamage(damageBySpinner, b.spinner, damage.damageToB, damage.damageToA);
-    addDamageEvent(damageEvents, a.spinner, b.spinner, damage.damageToB, damage.aCritsB);
-    addDamageEvent(damageEvents, b.spinner, a.spinner, damage.damageToA, damage.bCritsA);
+    addDamageEvent(damageEvents, a.spinner, b.spinner, damage.damageToB, damage.aCritsB, impactPosition, normal);
+    addDamageEvent(
+      damageEvents,
+      b.spinner,
+      a.spinner,
+      damage.damageToA,
+      damage.bCritsA,
+      impactPosition,
+      normal.clone().multiplyScalar(-1),
+    );
     pairImpactTimes.set(pairKey, elapsedTime);
     showImpactFeedback = true;
   }
@@ -212,14 +246,14 @@ function handleSpinnerCollisionPair<TSpinner extends CombatSpinnerState>(
     const criticalHit = damage.aCritsB || damage.bCritsA;
     a.spinner.pulseTimer = criticalHit ? 0.28 : 0.18;
     b.spinner.pulseTimer = criticalHit ? 0.28 : 0.18;
-    addKnockbackCommand(knockbacks, a.spinner, normal.clone().multiplyScalar(-1), damage.damageToA, damage.damageToB, damage.aCritsB, damage.bCritsA);
-    addKnockbackCommand(knockbacks, b.spinner, normal.clone(), damage.damageToB, damage.damageToA, damage.bCritsA, damage.aCritsB);
+    addKnockbackCommand(knockbacks, a.spinner, normal.clone().multiplyScalar(-1), damage.damageToA, damage.damageToB, damage.aCritsB, damage.bCritsA, b.spinner.collisionKnockbackMultiplier ?? 1);
+    addKnockbackCommand(knockbacks, b.spinner, normal.clone(), damage.damageToB, damage.damageToA, damage.bCritsA, damage.aCritsB, a.spinner.collisionKnockbackMultiplier ?? 1);
     addFlashCommand(flashes, a.spinner, damage.damageToA, damage.damageToB, damage.bCritsA);
     addFlashCommand(flashes, b.spinner, damage.damageToB, damage.damageToA, damage.aCritsB);
     addDamageNumberCandidate(damageNumberCandidates, b.spinner, a.spinner, damage.damageToA, damage.bCritsA, normal.clone().multiplyScalar(-1));
     addDamageNumberCandidate(damageNumberCandidates, a.spinner, b.spinner, damage.damageToB, damage.aCritsB, normal.clone());
     impacts.push({
-      position: a.position.clone().add(b.position).multiplyScalar(0.5),
+      position: impactPosition,
       normal: normal.clone(),
       critical: criticalHit,
     });
@@ -236,8 +270,10 @@ function getCollisionDamage(
   aCriticalSpeed: number,
   bCriticalSpeed: number,
 ): CollisionDamage {
-  let damageToB = aHitSpeed * damagePerSpeed * getOutgoingMultiplier(aZone) * getIncomingMultiplier(bZone) * (aSpinner.damageMultiplier ?? 1);
-  let damageToA = bHitSpeed * damagePerSpeed * getOutgoingMultiplier(bZone) * getIncomingMultiplier(aZone) * (bSpinner.damageMultiplier ?? 1);
+  let damageToB = aHitSpeed * damagePerSpeed * getOutgoingMultiplier(aZone) * getIncomingMultiplier(bZone)
+    * (aSpinner.damageMultiplier ?? 1) * (aSpinner.collisionDamageMultiplier ?? 1) * (bSpinner.incomingDamageMultiplier ?? 1);
+  let damageToA = bHitSpeed * damagePerSpeed * getOutgoingMultiplier(bZone) * getIncomingMultiplier(aZone)
+    * (bSpinner.damageMultiplier ?? 1) * (bSpinner.collisionDamageMultiplier ?? 1) * (aSpinner.incomingDamageMultiplier ?? 1);
   const aCritsB = isCriticalHit(aZone, bZone, aHitSpeed, aCriticalSpeed);
   const bCritsA = isCriticalHit(bZone, aZone, bHitSpeed, bCriticalSpeed);
 
@@ -259,6 +295,7 @@ function addKnockbackCommand<TSpinner extends CombatSpinnerState>(
   damageDealt: number,
   dealtCritical: boolean,
   receivedCritical: boolean,
+  distanceMultiplier: number,
 ): void {
   let distanceRadii = equalHitKnockbackRadii;
   if (receivedCritical) {
@@ -271,7 +308,7 @@ function addKnockbackCommand<TSpinner extends CombatSpinnerState>(
     distanceRadii = winnerKnockbackRadii;
   }
 
-  const distance = spinner.radius * distanceRadii;
+  const distance = spinner.radius * distanceRadii * distanceMultiplier;
   if (distance <= 0) {
     return;
   }
@@ -376,12 +413,66 @@ function addDamageEvent<TSpinner extends CombatSpinnerState>(
   target: TSpinner,
   amount: number,
   critical: boolean,
+  position: THREE.Vector3,
+  direction: THREE.Vector3,
 ): void {
   if (amount <= 0) {
     return;
   }
 
-  damageEvents.push({ source, target, amount, critical });
+  damageEvents.push({
+    source,
+    target,
+    amount,
+    critical,
+    position: position.clone(),
+    direction: direction.clone().normalize(),
+  });
+}
+
+export function applyDirectDamage<TSpinner extends CombatSpinnerState>(
+  source: TSpinner,
+  target: TSpinner,
+  baseAmount: number,
+  direction: THREE.Vector3,
+): DirectDamageResult<TSpinner> {
+  const amount = Math.min(baseAmount * (target.incomingDamageMultiplier ?? 1), target.maxRPM);
+  if (amount <= 0) {
+    return { damageEvent: null, damageNumber: null };
+  }
+
+  target.maxRPM = Math.max(0, target.maxRPM - amount);
+  target.currentRPM = Math.min(Math.max(0, target.currentRPM - amount), target.maxRPM);
+
+  const normalizedDirection = direction.clone();
+  normalizedDirection.y = 0;
+  if (normalizedDirection.lengthSq() <= 0.000001) {
+    normalizedDirection.copy(target.forwardDirection);
+    normalizedDirection.y = 0;
+  }
+  if (normalizedDirection.lengthSq() <= 0.000001) {
+    normalizedDirection.set(1, 0, 0);
+  }
+  normalizedDirection.normalize();
+
+  const position = target.group.position.clone();
+  return {
+    damageEvent: {
+      source,
+      target,
+      amount,
+      critical: false,
+      position,
+      direction: normalizedDirection.clone(),
+    },
+    damageNumber: {
+      source,
+      target,
+      amount,
+      critical: false,
+      direction: normalizedDirection,
+    },
+  };
 }
 
 function applyAccumulatedDamage<TSpinner extends CombatSpinnerState>(

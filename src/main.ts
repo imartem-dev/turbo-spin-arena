@@ -5,8 +5,6 @@ import iconBlueUrl from "./img/iconBlue.webp";
 import iconGreenUrl from "./img/iconGreen.webp";
 import iconRedUrl from "./img/iconRed.webp";
 import iconYellowUrl from "./img/iconYellow.webp";
-import grassTexture3Url from "./img/texture_grass3.webp";
-import grassTexture4Url from "./img/texture_grass4.webp";
 import { createMobileControls, type MobileControls } from "./input/mobileControls";
 import bonusPinkAuraPreset from "./VFX/bonusPink_aura-preset.json";
 import bonusRedAuraPreset from "./VFX/bonusRed_aura-preset.json";
@@ -19,6 +17,8 @@ import frostAuraPreset from "./VFX/Frost_aura-preset.json";
 import lightningAuraPreset from "./VFX/Lightning_aura-preset.json";
 import { BonusVfxPool, type ArenaBonusVfxType } from "./VFX/arenaBonusVfx";
 import { DamageNumberPool } from "./VFX/damageNumberPool";
+import { ElementalSkillVfx } from "./VFX/elementalSkillVfx";
+import { LightningChainVfx, type LightningChainSettings } from "./VFX/lightningChainVfx";
 import { SparkVfxPool } from "./VFX/sparkVfxPool";
 import {
   activeArena,
@@ -46,9 +46,21 @@ import {
   type CombatFlashCommand,
   type CombatFlashStep,
   type CombatKnockbackCommand,
+  applyDirectDamage,
   handleSpinnerCollisions,
   resetCombatState,
 } from "./simulation/combat";
+import {
+  activateElementalSkill,
+  clearElementalTarget,
+  createElementalSkillState,
+  defaultElementalSkillSettings,
+  resetElementalSkillState,
+  syncElementalCollisionModifiers,
+  updateElementalSkills,
+  type ElementalSkillResult,
+  type SpinnerElement,
+} from "./simulation/elementalSkills";
 import {
   getCurrentMoveSpeed,
   isCritSpeedReady,
@@ -147,12 +159,6 @@ type RpmHudElements = {
   bonusIcons?: HTMLElement;
 };
 
-type ForegroundGrassCards = {
-  group: THREE.Group;
-  left: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  right: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-};
-
 type DashHudElements = {
   root: HTMLElement;
   fill: HTMLElement;
@@ -226,6 +232,12 @@ type SpinnerState = {
   critSpeedEase: number;
   critDamageMultiplier: number;
   damageMultiplier: number;
+  incomingDamageMultiplier: number;
+  collisionDamageMultiplier: number;
+  collisionKnockbackMultiplier: number;
+  elementalMoveSpeedMultiplier: number;
+  elementalMovementLocked: boolean;
+  verticalLaunchActive: boolean;
   deathmatchStatus: DeathmatchStatus;
   respawnTimer: number;
   invulnerabilityTimer: number;
@@ -305,7 +317,14 @@ const ultimateChargeSettings = {
   activeDuration: 5,
   speedMultiplier: 1.1,
 };
-type SpinnerElement = "fire" | "ice" | "earth" | "lightning";
+const lightningChainSettings: LightningChainSettings = {
+  chainRadius: defaultElementalSkillSettings.lightningChainRadius,
+  maxChainTargets: defaultElementalSkillSettings.lightningMaxTargets,
+  chainDelay: 0.12,
+  beamHoldDuration: 0.2,
+  baseDamage: defaultElementalSkillSettings.lightningBaseDamage,
+  damageStep: defaultElementalSkillSettings.lightningDamageStep,
+};
 const elementOrder: SpinnerElement[] = ["fire", "ice", "earth", "lightning"];
 const ultimateAuraPresetByElement: Record<SpinnerElement, TornadoVfxPreset> = {
   fire: fireAuraPreset as TornadoVfxPreset,
@@ -482,14 +501,11 @@ fillLight.castShadow = false;
 scene.add(fillLight);
 scene.add(fillLight.target);
 
-const foregroundGrassCards = createForegroundGrassCards();
-camera.add(foregroundGrassCards.group);
-
 const arena = activeArena.createSceneObjects();
 scene.add(arena);
 const arenaBonusState = createArenaBonusState(activeArena.interestPoints);
 const arenaBonusVfxPool = new BonusVfxPool(scene, arenaBonusColorByType, reducedMotionQuery);
-arenaBonusVfxPool.prewarm({ pickups: 4, particles: 160, pulses: 36 });
+arenaBonusVfxPool.prewarm({ particles: 160, pulses: 36 });
 const enemySpinnerInstancedModel = new EnemySpinnerInstancedModel(scene, 9);
 const sparkVfxPool = new SparkVfxPool(scene, reducedMotionQuery);
 const damageNumberPool = new DamageNumberPool(scene, damageNumberFontFamily, () => damageNumberFontReady);
@@ -514,6 +530,14 @@ const player = createSpinner({
 
 const enemySpinners: SpinnerState[] = [];
 const combatSpinners: SpinnerState[] = [player];
+const elementalSkillState = createElementalSkillState<SpinnerState>();
+const elementalSkillVfx = new ElementalSkillVfx(scene, getActiveArenaHeight);
+const lightningChainVfx = new LightningChainVfx<SpinnerState>(
+  scene,
+  lightningChainSettings,
+  (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+  getActiveArenaHeight,
+);
 const botAiDirector = createBotAiDirector();
 const latestEnemyAiCommands = new Map<SpinnerState, BotAiCommand>();
 let hudElements: RpmHudElements[] = [];
@@ -590,6 +614,8 @@ function runGameFrame(): void {
 
   updateCritReadyVfx(frameDeltaTime);
   updateUltimateVfx(frameDeltaTime);
+  updateLightningChainVfx(frameDeltaTime);
+  elementalSkillVfx.update(frameDeltaTime, elapsedTime, camera);
   updateBonusAuraVfx(frameDeltaTime);
   updateDeathmatchProtectedVisuals(frameDeltaTime);
   updateHealAuraBursts(frameDeltaTime);
@@ -609,8 +635,10 @@ function runGameFrame(): void {
   }
   damageNumberPool.update(frameDeltaTime);
   updateDeathCamera(frameDeltaTime);
-  updateForegroundGrassCards(frameDeltaTime);
-  enemySpinnerInstancedModel.sync(enemySpinners);
+  for (const spinner of enemySpinners) {
+    enemySpinnerInstancedModel.setFrozen(spinner, spinner.elementalMovementLocked);
+  }
+  enemySpinnerInstancedModel.sync(enemySpinners, frameDeltaTime);
 
   renderer.render(scene, camera);
 }
@@ -643,6 +671,10 @@ function updateUltimateVfx(deltaTime: number): void {
       projectAuraGroundToArena(spinner.ultimateVfx);
     }
   }
+}
+
+function updateLightningChainVfx(deltaTime: number): void {
+  lightningChainVfx.updateVisuals(deltaTime, elapsedTime, camera, reducedMotionQuery.matches);
 }
 
 function updateBonusAuraVfx(deltaTime: number): void {
@@ -864,6 +896,12 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
     critSpeedEase: 0,
     critDamageMultiplier: 1,
     damageMultiplier: 1,
+    incomingDamageMultiplier: 1,
+    collisionDamageMultiplier: 1,
+    collisionKnockbackMultiplier: 1,
+    elementalMoveSpeedMultiplier: 1,
+    elementalMovementLocked: false,
+    verticalLaunchActive: false,
     deathmatchStatus: "alive",
     respawnTimer: 0,
     invulnerabilityTimer: 0,
@@ -944,6 +982,9 @@ function setEnemyCount(count: number): void {
     if (combatIndex >= 0) {
       combatSpinners.splice(combatIndex, 1);
     }
+    lightningChainVfx.cancelForSpinner(enemySpinner);
+    clearElementalTarget(elementalSkillState, enemySpinner);
+    enemySpinnerInstancedModel.setFrozen(enemySpinner, false);
     botAiDirector.forget(enemySpinner);
     latestEnemyAiCommands.delete(enemySpinner);
     disposeSpinner(enemySpinner);
@@ -1479,6 +1520,9 @@ function applyMenuTranslations(): void {
 
 function setSelectedElement(element: SpinnerElement): void {
   selectedElement = element;
+  if (selectedElement !== "lightning") {
+    lightningChainVfx.cancelForSpinner(player);
+  }
   replaceUltimateVfx(player, ultimateAuraPresetByElement[selectedElement]);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-element-choice]")) {
     button.classList.toggle("selected", button.dataset.elementChoice === selectedElement);
@@ -1492,58 +1536,6 @@ function replaceUltimateVfx(spinner: SpinnerState, preset: TornadoVfxPreset): vo
   spinner.ultimateVfx = new TornadoVfx(preset);
   spinner.ultimateVfx.group.visible = false;
   spinner.group.add(spinner.ultimateVfx.group);
-}
-
-function createForegroundGrassCards(): ForegroundGrassCards {
-  const loader = new THREE.TextureLoader();
-  const leftTexture = loader.load(grassTexture3Url);
-  const rightTexture = loader.load(grassTexture4Url);
-  leftTexture.colorSpace = THREE.SRGBColorSpace;
-  rightTexture.colorSpace = THREE.SRGBColorSpace;
-
-  const group = new THREE.Group();
-  group.name = "Foreground Grass Cards";
-
-  const left = createForegroundGrassCard(leftTexture);
-  left.name = "Foreground Grass Left";
-  left.rotation.z = 0.08;
-
-  const right = createForegroundGrassCard(rightTexture);
-  right.name = "Foreground Grass Right";
-  right.rotation.z = -0.08;
-
-  group.add(left, right);
-  left.position.set(-6.8, -2.85, -7.2);
-  right.position.set(6.8, -2.85, -7.2);
-
-  return { group, left, right };
-}
-
-function createForegroundGrassCard(texture: THREE.Texture): THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> {
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.8, 3.8),
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      alphaTest: 0.2,
-      depthTest: false,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  mesh.renderOrder = 1000;
-  return mesh;
-}
-
-function updateForegroundGrassCards(deltaTime: number): void {
-  const deathViewActive = deathCameraActive || deathCameraReturning;
-  void deltaTime;
-  const y = -2.85;
-  const z = -7.2;
-  const leftX = deathViewActive ? -10.2 : -6.8;
-  const rightX = deathViewActive ? 10.2 : 6.8;
-  foregroundGrassCards.left.position.set(leftX, y, z);
-  foregroundGrassCards.right.position.set(rightX, y, z);
 }
 
 function setupBotDifficultyControls(): void {
@@ -2024,6 +2016,15 @@ function tryActivatePlayerUltimate(): void {
 
   if (tryActivateUltimate(player.ultimate)) {
     player.pulseTimer = 0.28;
+    const result = activateElementalSkill(
+      elementalSkillState,
+      player,
+      enemySpinners,
+      selectedElement,
+      (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+    );
+    const damage = applyElementalSkillResult(result);
+    processDamageEvents(damage.damageEvents);
   }
 }
 
@@ -2118,6 +2119,19 @@ function simulatePhysicsTick(deltaTime: number): void {
   updateArenaBonusSystems(deltaTime);
   updateHealingZones(deltaTime);
 
+  const auraActive = isUltimateActive(player.ultimate) && isDeathmatchDamageable(player) && !player.respawnDash.active;
+  syncElementalCollisionModifiers(player, selectedElement, auraActive);
+  const elementalTickResult = updateElementalSkills(
+    elementalSkillState,
+    player,
+    enemySpinners,
+    auraActive,
+    deltaTime,
+    (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+  );
+  const elementalDamage = applyElementalSkillResult(elementalTickResult);
+  processDamageEvents(elementalDamage.damageEvents);
+
   const collisionResult = handleSpinnerCollisions(getDeathmatchDamageableSpinners(), elapsedTime);
   for (const knockback of collisionResult.knockbacks) {
     startSpinnerKnockback(knockback);
@@ -2131,6 +2145,15 @@ function simulatePhysicsTick(deltaTime: number): void {
   for (const impact of collisionResult.impacts) {
     spawnImpactSparks(impact.position, impact.normal, impact.critical);
   }
+  const lightningChainResult = updateLightningChainCombat(deltaTime, collisionResult.damageEvents);
+
+  if (selectedElement === "fire" && auraActive) {
+    for (const event of collisionResult.damageEvents) {
+      if (event.source === player && event.target !== player) {
+        elementalSkillVfx.spawnExplosion(event.position);
+      }
+    }
+  }
 
   for (const spinner of combatSpinners) {
     if (!isDeathmatchAlive(spinner)) {
@@ -2140,10 +2163,94 @@ function simulatePhysicsTick(deltaTime: number): void {
     updateUltimatePassiveCharge(spinner.ultimate, deltaTime);
     updateSpinVisuals(spinner, deltaTime);
   }
-  applyUltimateChargeFromDamage(collisionResult.damageEvents);
-  updateDeathmatchScores(collisionResult.damageEvents);
+  processDamageEvents([
+    ...collisionResult.damageEvents,
+    ...lightningChainResult.damageEvents,
+  ]);
 
   sparkVfxPool.update(deltaTime);
+}
+
+function updateLightningChainCombat(
+  deltaTime: number,
+  damageEvents: CombatDamageEvent<SpinnerState>[],
+): { damageEvents: CombatDamageEvent<SpinnerState>[] } {
+  const commands = lightningChainVfx.advance(deltaTime, enemySpinners, reducedMotionQuery.matches).damageCommands;
+  const triggerEvent = damageEvents.find((event) => canStartLightningChain(event));
+  if (triggerEvent) {
+    commands.push(...lightningChainVfx.tryStart(
+      player,
+      triggerEvent.target,
+      enemySpinners,
+      reducedMotionQuery.matches,
+    ).damageCommands);
+  }
+
+  const result: CombatDamageEvent<SpinnerState>[] = [];
+  for (const command of commands) {
+    const applied = applyDirectDamage(command.source, command.target, command.amount, command.direction);
+    if (applied.damageEvent) {
+      result.push(applied.damageEvent);
+    }
+    if (applied.damageNumber) {
+      spawnDamageNumber(applied.damageNumber);
+    }
+  }
+  return { damageEvents: result };
+}
+
+function canStartLightningChain(event: CombatDamageEvent<SpinnerState>): boolean {
+  return (
+    selectedElement === "lightning" &&
+    isUltimateActive(player.ultimate) &&
+    isDeathmatchDamageable(player) &&
+    !player.respawnDash.active &&
+    event.source === player &&
+    event.target !== player &&
+    enemySpinners.includes(event.target) &&
+    isDeathmatchDamageable(event.target) &&
+    !event.target.respawnDash.active
+  );
+}
+
+function applyElementalSkillResult(
+  result: ElementalSkillResult<SpinnerState>,
+): { damageEvents: CombatDamageEvent<SpinnerState>[] } {
+  const damageEvents: CombatDamageEvent<SpinnerState>[] = [];
+  for (const command of result.damageCommands) {
+    const applied = applyDirectDamage(command.source, command.target, command.amount, command.direction);
+    if (applied.damageEvent) {
+      damageEvents.push(applied.damageEvent);
+    }
+    if (applied.damageNumber) {
+      spawnDamageNumber(applied.damageNumber);
+    }
+  }
+  for (const command of result.launchCommands) {
+    command.target.knockback.active = false;
+    command.target.velocity.set(0, 0, 0);
+    command.target.grounded = false;
+    command.target.verticalLaunchActive = true;
+    command.target.verticalVelocity = Math.max(command.target.verticalVelocity, command.verticalVelocity);
+  }
+  for (const command of result.freezeCommands) {
+    enemySpinnerInstancedModel.setFrozen(command.target, command.frozen);
+    if (!command.frozen) {
+      elementalSkillVfx.spawnThawShards(command.target.group.position, command.target.radius, reducedMotionQuery.matches);
+    }
+  }
+  for (const position of result.rockRipplePositions) {
+    elementalSkillVfx.spawnRockRipple(position);
+  }
+  return { damageEvents };
+}
+
+function processDamageEvents(damageEvents: CombatDamageEvent<SpinnerState>[]): void {
+  for (const event of damageEvents) {
+    elementalSkillVfx.spawnHit(event, reducedMotionQuery.matches);
+  }
+  applyUltimateChargeFromDamage(damageEvents);
+  updateDeathmatchScores(damageEvents);
 }
 
 function getDeathmatchParticipants(): SpinnerState[] {
@@ -2195,11 +2302,27 @@ function startDeathmatchRespawn(spinner: SpinnerState): void {
   spinner.critSpeedEase = 0;
   spinner.critDamageMultiplier = 1;
   spinner.damageMultiplier = 1;
+  spinner.incomingDamageMultiplier = 1;
+  spinner.collisionDamageMultiplier = 1;
+  spinner.collisionKnockbackMultiplier = 1;
+  spinner.elementalMoveSpeedMultiplier = 1;
+  spinner.elementalMovementLocked = false;
+  spinner.verticalLaunchActive = false;
   spinner.grounded = true;
   spinner.verticalVelocity = 0;
   spinner.heightOffset = 0;
   spinner.distanceMovedThisTick = 0;
   spinner.pulseTimer = 0;
+  lightningChainVfx.cancelForSpinner(spinner);
+  if (spinner === player) {
+    for (const frozenTarget of resetElementalSkillState(elementalSkillState, enemySpinners)) {
+      enemySpinnerInstancedModel.setFrozen(frozenTarget, false);
+    }
+    syncElementalCollisionModifiers(player, selectedElement, false);
+  } else {
+    clearElementalTarget(elementalSkillState, spinner);
+    enemySpinnerInstancedModel.setFrozen(spinner, false);
+  }
   finishSpinnerFlash(spinner);
   clearSpinnerTrail(spinner);
   hideSpinnerTrailAndTarget(spinner);
@@ -2644,6 +2767,10 @@ function easeInOut(value: number): number {
 }
 
 function startSpinnerKnockback(command: CombatKnockbackCommand<SpinnerState>): void {
+  if (command.spinner.elementalMovementLocked || command.spinner.verticalLaunchActive) {
+    return;
+  }
+
   const direction = command.direction.clone();
   direction.y = 0;
   if (direction.lengthSq() <= 0.000001 || command.distance <= 0 || command.duration <= 0) {
@@ -3057,6 +3184,18 @@ function projectPointOutsideBotCursorRadius(spinner: SpinnerState, point: THREE.
 
 function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number): void {
   spinner.lastPosition.copy(spinner.group.position);
+  if (spinner.elementalMovementLocked || spinner.verticalLaunchActive) {
+    spinner.knockback.active = false;
+    spinner.velocity.set(0, 0, 0);
+    updateSpinnerVerticalState(spinner, deltaTime);
+    if (spinner.verticalLaunchActive && spinner.grounded) {
+      spinner.verticalLaunchActive = false;
+    }
+    spinner.distanceMovedThisTick = 0;
+    updateDashState(spinner.dash, deltaTime, 0);
+    sampleSpinnerTrail(spinner, deltaTime);
+    return;
+  }
   if (updateSpinnerKnockback(spinner, deltaTime)) {
     spinner.distanceMovedThisTick = 0;
     updateDashState(spinner.dash, deltaTime, spinner.distanceMovedThisTick);
@@ -3115,11 +3254,12 @@ function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number)
 }
 
 function getAvailableMoveSpeed(spinner: SpinnerState): number {
+  const elementalMultiplier = spinner.elementalMoveSpeedMultiplier;
   if (isUltimateActive(spinner.ultimate)) {
-    return spinner.baseMoveSpeed * spinner.bonusSpeedMultiplier * spinner.ultimate.settings.speedMultiplier;
+    return spinner.baseMoveSpeed * spinner.bonusSpeedMultiplier * spinner.ultimate.settings.speedMultiplier * elementalMultiplier;
   }
 
-  return getCurrentMoveSpeed(spinner);
+  return getCurrentMoveSpeed(spinner) * elementalMultiplier;
 }
 
 function updateSpinnerKnockback(spinner: SpinnerState, deltaTime: number): boolean {

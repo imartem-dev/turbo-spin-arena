@@ -219,7 +219,7 @@ function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
 
 function createGroundBand(): THREE.Group {
   const group = new THREE.Group();
-  const grass = new THREE.Mesh(
+  const groundBand = new THREE.Mesh(
     new THREE.RingGeometry(arenaRadius * 1.08, 64, 256),
     new THREE.MeshBasicMaterial({
       color: useTileTextureTest ? "#ffffff" : "#9fbd66",
@@ -227,9 +227,9 @@ function createGroundBand(): THREE.Group {
       side: THREE.DoubleSide,
     }),
   );
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.y = getArenaHeightAt(arenaRadius, 0) - 0.18;
-  group.add(grass);
+  groundBand.rotation.x = -Math.PI / 2;
+  groundBand.position.y = getArenaHeightAt(arenaRadius, 0) - 0.18;
+  group.add(groundBand);
 
   if (useTileTextureTest) {
     return group;
@@ -246,7 +246,7 @@ function createGroundBand(): THREE.Group {
     }),
   );
   redEarth.rotation.x = -Math.PI / 2;
-  redEarth.position.y = grass.position.y + 0.012;
+  redEarth.position.y = groundBand.position.y + 0.012;
   group.add(redEarth);
 
   return group;

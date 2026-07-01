@@ -20,7 +20,6 @@ export type MobileControls = {
   setUltimateReady: (ready: boolean, active: boolean) => void;
 };
 
-const joystickRadius = 46;
 const deadZone = 0.14;
 
 export function createMobileControls(options: MobileControlsOptions): MobileControls {
@@ -34,6 +33,8 @@ export function createMobileControls(options: MobileControlsOptions): MobileCont
     const offsetX = event.clientX - centerX;
     const offsetY = event.clientY - centerY;
     const distance = Math.hypot(offsetX, offsetY);
+    const thumbRect = options.thumb.getBoundingClientRect();
+    const joystickRadius = Math.max(1, Math.min(rect.width - thumbRect.width, rect.height - thumbRect.height) * 0.5);
     const clampedDistance = Math.min(distance, joystickRadius);
     const angle = Math.atan2(offsetY, offsetX);
     const normalizedDistance = clampedDistance / joystickRadius;
