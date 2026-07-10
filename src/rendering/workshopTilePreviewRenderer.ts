@@ -3,7 +3,6 @@ import { auraCatalog, modelCatalog } from "../progression/catalog";
 import { cosmeticAuraPresetById } from "../VFX/cosmeticAuraPresets";
 import { TornadoVfx } from "../tornadoVfx";
 import { createAnimeSpinnerVisual, type AnimeSpinnerVisual } from "./animeSpinnerMaterial";
-import { AnimeOutlinePass } from "./animeOutlinePass";
 import { isSpinnerModelAssetKey, type SpinnerModelLoader } from "./spinnerModelLoader";
 import { computeWorkshopCanvasPixelRatio } from "../ui/workshopLayout";
 
@@ -35,14 +34,6 @@ export class WorkshopTilePreviewRenderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 30);
-  private readonly outlinePass = new AnimeOutlinePass({
-    outerWidth: 2,
-    innerWidth: 0.75,
-    normalThreshold: 0.58,
-    depthThreshold: 0.014,
-    innerOpacity: 0.5,
-    outerOpacity: 1,
-  });
   private readonly models = new Map<string, ThumbnailModel>();
   private readonly auras = new Map<string, TornadoVfx>();
   private readonly modelCameraDirection = new THREE.Vector3(0, 0.22, 1).normalize();
@@ -139,19 +130,6 @@ export class WorkshopTilePreviewRenderer {
       this.renderer.setViewport(viewportX, viewportY, rect.width, rect.height);
       this.renderer.setScissor(clip.left, this.height - clip.bottom, clip.width, clip.height);
       this.renderer.render(this.scene, this.camera);
-      if ((kind === "model" || kind === "model-slot") && itemId) {
-        const model = this.models.get(itemId);
-        if (model?.visual.root.userData.spinnerScreenOutline === true) {
-          this.outlinePass.render(
-            this.renderer,
-            this.scene,
-            this.camera,
-            [model.visual.root],
-            { x: viewportX, y: viewportY, width: rect.width, height: rect.height },
-            { x: clip.left, y: this.height - clip.bottom, width: clip.width, height: clip.height },
-          );
-        }
-      }
     }
     this.hideAll();
     this.renderer.setScissorTest(false);

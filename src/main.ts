@@ -124,6 +124,7 @@ import {
   type WorkshopCategory,
   type WorkshopPreviewSelection,
 } from "./ui/gameUi";
+import { applyAppViewport, getAppViewport } from "./ui/appViewport";
 import { applyWorkshopStageLayout } from "./ui/workshopLayout";
 import { setupMainMenu } from "./ui/mainMenu";
 import {
@@ -427,6 +428,7 @@ const maxTrailPoints = maxSpinnerTrailPoints;
 const damageNumberFontUrl = `${import.meta.env.BASE_URL}assets/fonts/ZeroCool.woff2`;
 const damageNumberFontFamily = "ZeroCoolDamage";
 const maxRendererPixelRatio = 1.25;
+const screenOutlineQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
 const auraGroundPlaneOffset = 0.06;
 const cameraLookAtTarget = new THREE.Vector3(0, 0, 0);
 const airborneGravity = -18;
@@ -495,18 +497,20 @@ const gameUi = new GameUiController({
 });
 document.documentElement.lang = language;
 document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+let appViewport = getAppViewport(window);
+const initialViewport = syncAppViewport();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#172820");
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(50, initialViewport.width / initialViewport.height, 0.1, 100);
 camera.position.copy(defaultCameraPosition);
 camera.lookAt(cameraLookAtTarget);
 scene.add(camera);
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(initialViewport.width, initialViewport.height);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = false;
 document.body.appendChild(renderer.domElement);
@@ -515,7 +519,7 @@ const combatAnimeOutlinePass = new AnimeOutlinePass({
   innerWidth: 0.75,
   normalThreshold: 0.58,
   depthThreshold: 0.014,
-  innerOpacity: 0.48,
+  innerOpacity: 0,
   outerOpacity: 1,
 });
 const combatAnimeOutlineViewport = new THREE.Vector4();
@@ -619,6 +623,7 @@ renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 renderer.domElement.addEventListener("contextmenu", preventContextMenu);
 window.addEventListener("contextmenu", preventContextMenu);
 window.addEventListener("resize", handleResize);
+window.visualViewport?.addEventListener("resize", handleResize);
 
 function startGameLoop(): void {
   if (gameLoopStarted) {
@@ -647,10 +652,10 @@ function runGameFrame(): void {
     workshopPreview.update(frameDeltaTime, workshopElapsedTime);
     const previewPanel = document.querySelector<HTMLElement>("[data-workshop-preview]");
     const previewRect = previewPanel?.getBoundingClientRect();
-    const previewWidth = previewRect?.width ?? window.innerWidth * 0.4;
-    const previewHeight = previewRect?.height ?? window.innerHeight;
+    const previewWidth = previewRect?.width ?? appViewport.width * 0.4;
+    const previewHeight = previewRect?.height ?? appViewport.height;
     const previewX = previewRect?.left ?? 0;
-    const previewY = previewRect ? window.innerHeight - previewRect.bottom : 0;
+    const previewY = previewRect ? appViewport.height - previewRect.bottom : 0;
     workshopPreview.resize(previewWidth, previewHeight, previewX, previewY);
     workshopPreview.render(renderer);
     workshopTilePreviewRenderer.updateAndRender(frameDeltaTime, workshopElapsedTime, workshopTab === "style");
@@ -697,7 +702,7 @@ function runGameFrame(): void {
   }
 
   renderer.render(scene, camera);
-  if (appScreen === "match") {
+  if (appScreen === "match" && screenOutlineQuery.matches) {
     const outlineTargets = collectCombatAnimeOutlineTargets();
     if (import.meta.env.DEV) renderer.domElement.dataset.animeOutlineTargets = String(outlineTargets.length);
     renderer.getViewport(combatAnimeOutlineViewport);
@@ -3675,14 +3680,21 @@ function updateArenaBonusVisuals(deltaTime: number): void {
 }
 
 function handleResize(): void {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const viewport = syncAppViewport();
+  camera.aspect = viewport.width / viewport.height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(viewport.width, viewport.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
-  updateWorkshopStageLayout();
+  updateWorkshopStageLayout(viewport);
 }
 
-function updateWorkshopStageLayout(): void {
+function syncAppViewport() {
+  appViewport = getAppViewport(window);
+  applyAppViewport(document.documentElement, appViewport);
+  return appViewport;
+}
+
+function updateWorkshopStageLayout(viewport = getAppViewport(window)): void {
   const stage = document.querySelector<HTMLElement>("[data-workshop-stage]");
-  if (stage) applyWorkshopStageLayout(stage, window.innerWidth, window.innerHeight);
+  if (stage) applyWorkshopStageLayout(stage, viewport.width, viewport.height);
 }

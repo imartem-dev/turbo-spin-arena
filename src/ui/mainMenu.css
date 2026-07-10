@@ -43,8 +43,8 @@
 .menu-stage {
   container-type: size;
   position: relative;
-  width: min(100vw, 177.7778vh);
-  height: min(100vh, 56.25vw);
+  width: var(--app-viewport-width);
+  height: var(--app-viewport-height);
   overflow: visible;
   font-family: "ZeroCool", Impact, "Arial Narrow", sans-serif;
   text-transform: uppercase;

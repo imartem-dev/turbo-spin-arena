@@ -24,7 +24,7 @@ export class WorkshopPreview {
     innerWidth: 1,
     normalThreshold: 0.5,
     depthThreshold: 0.012,
-    innerOpacity: 0.68,
+    innerOpacity: 0,
     outerOpacity: 1,
   });
   private readonly transientAura = new TornadoVfx(cosmeticAuraPresetById.aura_crit);
@@ -36,7 +36,9 @@ export class WorkshopPreview {
   private readonly trailPoints = Array.from({ length: maxSpinnerTrailPoints }, () => new THREE.Vector3());
   private readonly trailCurrentPoint = new THREE.Vector3(0, 0.075, 0);
   private readonly clearColor = new THREE.Color();
+  private readonly rendererSize = new THREE.Vector2();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  private readonly screenOutlineQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
   private model: AnimeSpinnerVisual | null = null;
   private colors: [string, string, string] = ["#FFFFFF", "#808080", "#0B1F3A"];
   private width = 1;
@@ -126,9 +128,10 @@ export class WorkshopPreview {
     renderer.getClearColor(this.clearColor);
     const clearAlpha = renderer.getClearAlpha();
     const autoClear = renderer.autoClear;
+    renderer.getSize(this.rendererSize);
     renderer.setScissorTest(false);
     renderer.setClearColor(0x000000, 0);
-    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.setViewport(0, 0, this.rendererSize.x, this.rendererSize.y);
     renderer.autoClear = true;
     renderer.clear(true, true, true);
     renderer.setScissorTest(true);
@@ -136,7 +139,7 @@ export class WorkshopPreview {
     renderer.setScissor(this.viewportX, this.viewportY, this.width, this.height);
     renderer.autoClear = false;
     renderer.render(this.scene, this.camera);
-    if (this.model?.root.userData.spinnerScreenOutline === true) {
+    if (this.screenOutlineQuery.matches && this.model?.root.userData.spinnerScreenOutline === true) {
       this.outlinePass.render(renderer, this.scene, this.camera, [this.model.root], {
         x: this.viewportX,
         y: this.viewportY,
@@ -147,7 +150,7 @@ export class WorkshopPreview {
     renderer.autoClear = autoClear;
     renderer.setClearColor(this.clearColor, clearAlpha);
     renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.setViewport(0, 0, this.rendererSize.x, this.rendererSize.y);
   }
 
   dispose(): void {
