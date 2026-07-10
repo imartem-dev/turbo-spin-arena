@@ -5,11 +5,15 @@ import tileTextureUrl from "../img/tileTexture_test.webp";
 import arenaTextureUrl from "../img/texture_test.webp";
 
 export type ArenaDefinition = {
+  id: "duel" | "deathmatch";
   radius: number;
   playerStart: THREE.Vector3;
   enemySpawns: THREE.Vector3[];
   interestPoints: THREE.Vector3[];
   getHeightAt(x: number, z: number): number;
+  contains(position: THREE.Vector3, margin?: number): boolean;
+  clampPoint(position: THREE.Vector3, margin?: number): THREE.Vector3;
+  getBoundaryPoint(position: THREE.Vector3): THREE.Vector3;
   createSceneObjects(): THREE.Group;
 };
 
@@ -77,7 +81,8 @@ if (bowlSurfaceTexture) {
   applyArenaTextureSettings();
 }
 
-export const activeArena: ArenaDefinition = {
+export const duelArena: ArenaDefinition = {
+  id: "duel",
   radius: arenaRadius,
   playerStart: pointOnArena(-1.7, 0.75),
   enemySpawns: [
@@ -96,15 +101,26 @@ export const activeArena: ArenaDefinition = {
     pointOnArena(0, -4.2),
   ],
   getHeightAt: getArenaHeightAt,
+  contains: containsDuelPoint,
+  clampPoint: clampDuelPoint,
+  getBoundaryPoint: getDuelBoundaryPoint,
   createSceneObjects,
 };
+
+export let activeArena: ArenaDefinition = duelArena;
+
+export function setActiveArena(arena: ArenaDefinition): void {
+  activeArena = arena;
+}
 
 export function getActiveArenaHeight(position: THREE.Vector3): number {
   return getArenaSurfaceHeight(position);
 }
 
 export function projectToArenaSurface(position: THREE.Vector3, offsetY = 0): THREE.Vector3 {
-  return position.clone().setY(getActiveArenaHeight(position) + offsetY);
+  const projected = activeArena.clampPoint(position);
+  projected.y = activeArena.getHeightAt(projected.x, projected.z) + offsetY;
+  return projected;
 }
 
 export function getArenaSurfaceHeight(position: THREE.Vector3): number {
@@ -117,22 +133,15 @@ export function getArenaSurfaceHeight(position: THREE.Vector3): number {
 }
 
 export function getArenaEdgePoint(position: THREE.Vector3): THREE.Vector3 {
-  const edgePoint = position.clone();
-  const distance = Math.hypot(edgePoint.x, edgePoint.z);
-  if (distance <= 0.000001) {
-    edgePoint.x = activeArena.radius;
-    edgePoint.z = 0;
-    return projectToArenaSurface(edgePoint);
-  }
-
-  const scale = activeArena.radius / distance;
-  edgePoint.x *= scale;
-  edgePoint.z *= scale;
-  return projectToArenaSurface(edgePoint);
+  return projectToArenaSurface(activeArena.getBoundaryPoint(position));
 }
 
 export function isOutsideArena(position: THREE.Vector3, margin = 0): boolean {
-  return Math.hypot(position.x, position.z) > activeArena.radius + margin;
+  return !activeArena.contains(position, margin);
+}
+
+export function clampToActiveArena(position: THREE.Vector3, margin = 0): THREE.Vector3 {
+  return projectToArenaSurface(activeArena.clampPoint(position, margin));
 }
 
 export function getBowlDepth(): number {
@@ -175,6 +184,34 @@ export function rebuildActiveArenaSceneObjects(group: THREE.Group): void {
 
 function pointOnArena(x: number, z: number): THREE.Vector3 {
   return new THREE.Vector3(x, getArenaHeightAt(x, z), z);
+}
+
+function containsDuelPoint(position: THREE.Vector3, margin = 0): boolean {
+  return Math.hypot(position.x, position.z) <= arenaRadius + margin;
+}
+
+function clampDuelPoint(position: THREE.Vector3, margin = 0): THREE.Vector3 {
+  const result = position.clone();
+  const limit = Math.max(0, arenaRadius - margin);
+  const distance = Math.hypot(result.x, result.z);
+  if (distance > limit && distance > 0.000001) {
+    result.x *= limit / distance;
+    result.z *= limit / distance;
+  }
+  result.y = getArenaHeightAt(result.x, result.z);
+  return result;
+}
+
+function getDuelBoundaryPoint(position: THREE.Vector3): THREE.Vector3 {
+  const result = position.clone();
+  const distance = Math.hypot(result.x, result.z);
+  if (distance <= 0.000001) result.set(arenaRadius, 0, 0);
+  else {
+    result.x *= arenaRadius / distance;
+    result.z *= arenaRadius / distance;
+  }
+  result.y = getArenaHeightAt(result.x, result.z);
+  return result;
 }
 
 function getArenaHeightAt(x: number, z: number): number {

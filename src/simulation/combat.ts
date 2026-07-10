@@ -436,7 +436,10 @@ export function applyDirectDamage<TSpinner extends CombatSpinnerState>(
   baseAmount: number,
   direction: THREE.Vector3,
 ): DirectDamageResult<TSpinner> {
-  const amount = Math.min(baseAmount * (target.incomingDamageMultiplier ?? 1), target.maxRPM);
+  const amount = Math.min(
+    baseAmount * (source.damageMultiplier ?? 1) * (target.incomingDamageMultiplier ?? 1),
+    target.maxRPM,
+  );
   if (amount <= 0) {
     return { damageEvent: null, damageNumber: null };
   }

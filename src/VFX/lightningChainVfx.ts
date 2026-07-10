@@ -147,6 +147,16 @@ export class LightningChainVfx<TSpinner extends CombatSpinnerState> {
     }
   }
 
+  reset(camera: THREE.Camera): void {
+    this.stopActiveChain();
+    for (const segment of this.segments) {
+      segment.vfx.update(100, 0, camera, true);
+    }
+    for (const vfx of this.hitVfx) {
+      vfx.update(100, 0, camera);
+    }
+  }
+
   dispose(): void {
     this.stopActiveChain();
     for (const segment of this.segments) {

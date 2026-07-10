@@ -34,9 +34,6 @@ export type ExplosionVfxConfig = {
   flareDuration: number;
   crackScale: number;
   crackDuration: number;
-  lightIntensity: number;
-  lightRange: number;
-  lightDuration: number;
 };
 
 type ExplosionTextures = {
@@ -84,9 +81,6 @@ export const defaultExplosionVfxConfig: ExplosionVfxConfig = {
   flareDuration: 0.26,
   crackScale: 3.6,
   crackDuration: 1.35,
-  lightIntensity: 7.5,
-  lightRange: 5.8,
-  lightDuration: 0.28,
 };
 
 const identityMatrix = new THREE.Matrix4();
@@ -153,7 +147,6 @@ class ExplosionVfxInstance {
   private readonly streakMesh: THREE.InstancedMesh;
   private readonly flareMesh: THREE.Mesh;
   private readonly cracksMesh: THREE.Mesh;
-  private readonly light: THREE.PointLight;
   private readonly airGroup = new THREE.Group();
   private readonly cameraRight = new THREE.Vector3(1, 0, 0);
   private readonly cameraUp = new THREE.Vector3(0, 1, 0);
@@ -202,10 +195,6 @@ class ExplosionVfxInstance {
     this.cracksMesh.renderOrder = 2;
     this.cracksMesh.frustumCulled = false;
 
-    this.light = new THREE.PointLight(config.emissionColor, 0, config.lightRange);
-    this.light.name = "Explosion Light Flash";
-    this.light.position.y = 0.55;
-
     this.airGroup.name = "Explosion Air Effects";
     this.airGroup.position.y = config.cloudScaleMax + 0.08;
     this.airGroup.add(
@@ -214,7 +203,7 @@ class ExplosionVfxInstance {
       this.streakMesh,
       this.flareMesh,
     );
-    this.group.add(this.cracksMesh, this.airGroup, this.light);
+    this.group.add(this.cracksMesh, this.airGroup);
   }
 
   spawn(position: THREE.Vector3): void {
@@ -233,7 +222,6 @@ class ExplosionVfxInstance {
     if (this.age >= this.config.duration) {
       this.active = false;
       this.group.visible = false;
-      this.light.intensity = 0;
       return;
     }
 
@@ -251,8 +239,6 @@ class ExplosionVfxInstance {
     setUniform(this.flareMaterial, "uAge", this.age);
     setUniform(this.cracksMaterial, "uAge", this.age);
 
-    const lightLife = 1 - smoothStep01(this.age / this.config.lightDuration);
-    this.light.intensity = this.config.lightIntensity * lightLife;
   }
 
   dispose(): void {

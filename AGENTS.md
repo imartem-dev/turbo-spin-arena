@@ -31,3 +31,15 @@ Keep refactors surgical:
 - Per-frame animation should update transforms, visibility, opacity, shader uniforms, existing buffer attributes, or instance matrices. It should not allocate new render resources.
 - Do not update human-readable DOM text every frame. Values meant for a person to read, such as health, cooldowns, timers, scores, stats, labels, and table rows, must be event-driven or throttled to a human-readable rate outside the render loop.
 - All visible UI text must go through `src/i18n.ts` keys instead of hardcoded DOM strings.
+
+# UI Selection Highlight Rules
+
+- Selection, active, equipped, hover, and focus outlines must align with the real visible frame of the UI element. Do not draw a second smaller outline inside the existing frame unless the design explicitly calls for a nested frame.
+- Before changing a highlight, inspect the actual element geometry and computed styles: border width, border radius, padding, overflow, pseudo-elements, z-index, and any inherited or earlier CSS rules that may still draw old borders or shadows.
+- A selected frame should read as the existing frame becoming highlighted. Put the stroke on the same box as the original frame, or make the pseudo-element cover the same border box. Do not leave visible gaps between the solid stroke and the glow.
+- Soft highlight/glow layers must share the same shape as the frame they support. Match the frame radius through inheritance or calculated offsets, and expand the glow layer only enough to sit under the stroke instead of creating a visibly different corner curve.
+- If a highlight uses a pseudo-element, verify how CSS positions it relative to the border box and padding box. Account for anti-aliasing at rounded corners so the glow meets the stroke cleanly.
+- Remove or override old highlight rules on child tiles, preview buttons, canvases, or nested controls when a parent card becomes the selected surface. The selected state should not show multiple unrelated rectangular outlines.
+- Disabled purchase/action buttons should look inactive through neutral styling, not by becoming hard to read. Keep disabled labels and prices legible unless the design explicitly hides them.
+- For WebGL or canvas previews inside UI cards, keep UI overlays such as selection frames, checkmarks, locks, and prices above the preview layer. Verify with computed z-index or a browser screenshot.
+- After changing selection/highlight CSS, verify at least one example of each affected component category in a real browser. Use computed styles or screenshots to confirm that the stroke, radius, glow, and overlay order match the intended geometry.

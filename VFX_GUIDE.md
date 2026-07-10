@@ -42,6 +42,30 @@ Important:
 - The effect is static unless `update(deltaTime, elapsedTime)` is called every frame.
 - Visual parity requires the same Three.js material/shader logic, not just the same JSON.
 
+## Runtime One-Shot Pools
+
+| Effect | Module / class | Assets | Lifecycle and trigger | Exact frame update | Placement requirements |
+| --- | --- | --- | --- | --- | --- |
+| Hit | `hitVfx.ts` / `HitVfxPool` | `assets/vfx/Hit/` | Pooled directional one-shot; `spawn(position, direction, options?)` | `update(deltaTime, camera)` | Scene root; direction is interpreted on XZ |
+
+### HitVfxPool
+
+Pooled directional impact built from random center/ring masks, two long segments
+toward the target, one short segment toward the attacker, and radial sparks.
+Runtime atlases, color-gradient and dissolve masks are loaded through `ready`.
+Pass elemental edges, ring/spark color, reduced motion, and optional seed through
+`HitVfxSpawnOptions`; keep gameplay conditions outside this module. Texture URLs
+must be built from the app `BASE_URL` so hosted builds under a subpath resolve
+`assets/vfx/Hit/` correctly.
+
+Acceptance notes:
+
+1. Copy both `src/VFX/hitVfx.ts` and `public/assets/vfx/Hit/`.
+2. Add `HitVfxPool.group` to the scene root exactly once.
+3. Wait for `HitVfxPool.ready` before enabling hit spawning.
+4. Call `update(deltaTime, camera)` once per rendered frame.
+5. Spawn positions are world-space; directions are normalized on XZ internally.
+
 ## 2. Preset Shape
 
 Current preset version:

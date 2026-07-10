@@ -110,6 +110,27 @@ export class BonusVfxPool {
     this.updatePulses(deltaTime);
   }
 
+  reset(): void {
+    for (const visual of this.activePickups.values()) {
+      this.releasePickup(visual);
+    }
+    this.activePickups.clear();
+    while (this.activeParticles.length > 0) {
+      const particle = this.activeParticles.pop()!;
+      particle.mesh.visible = false;
+      particle.mesh.position.copy(hiddenPosition);
+      particle.material.opacity = 0;
+      this.idleParticles.push(particle);
+    }
+    while (this.activePulses.length > 0) {
+      const pulse = this.activePulses.pop()!;
+      pulse.mesh.visible = false;
+      pulse.mesh.position.copy(hiddenPosition);
+      pulse.material.opacity = 0;
+      this.idlePulses.push(pulse);
+    }
+  }
+
   dispose(): void {
     this.activePickups.clear();
     this.scene.remove(this.orbPool.group);

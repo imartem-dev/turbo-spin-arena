@@ -1,6 +1,6 @@
 ﻿import * as THREE from "three";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import backgroundImageUrl from "./img/background.webp";
+import "./ui/gameUi.css";
+import "./ui/mainMenu.css";
 import iconBlueUrl from "./img/iconBlue.webp";
 import iconGreenUrl from "./img/iconGreen.webp";
 import iconRedUrl from "./img/iconRed.webp";
@@ -15,17 +15,25 @@ import earthAuraPreset from "./VFX/earth_aura-preset.json";
 import fireAuraPreset from "./VFX/Fire_aura_preset.json";
 import frostAuraPreset from "./VFX/Frost_aura-preset.json";
 import lightningAuraPreset from "./VFX/Lightning_aura-preset.json";
+import { cosmeticAuraPresetById } from "./VFX/cosmeticAuraPresets";
 import { BonusVfxPool, type ArenaBonusVfxType } from "./VFX/arenaBonusVfx";
 import { DamageNumberPool } from "./VFX/damageNumberPool";
 import { ElementalSkillVfx } from "./VFX/elementalSkillVfx";
 import { LightningChainVfx, type LightningChainSettings } from "./VFX/lightningChainVfx";
-import { SparkVfxPool } from "./VFX/sparkVfxPool";
+import { maxSpinnerTrailPoints, SpinnerTrailVisual } from "./VFX/spinnerTrail";
 import {
   activeArena,
+  duelArena,
   getActiveArenaHeight,
   getArenaEdgePoint,
   projectToArenaSurface,
+  setActiveArena,
 } from "./arenas/bowlArena";
+import { deathmatchArena } from "./arenas/deathmatchArena";
+import { colorCatalog, cosmeticCatalog, modelCatalog, trailCatalog, type CatalogItem } from "./progression/catalog";
+import { addParts, getUpgradeValue, grantOwnedItem, loadPlayerProfile, purchaseItem, purchaseUpgrade, savePlayerProfile } from "./progression/playerProfile";
+import { calculateMatchReward, type GameMode, type MatchResult } from "./progression/matchProgression";
+import { localPlatform } from "./platform/localPlatform";
 import { createTranslator, detectLanguage } from "./i18n";
 import { createDashState, getDashSpeedMultiplier, tryStartDash, updateDashState, type DashState } from "./simulation/dash";
 import {
@@ -98,6 +106,34 @@ import {
 } from "./simulation/deathmatch";
 import { TornadoVfx, type TornadoVfxPreset } from "./tornadoVfx";
 import { EnemySpinnerInstancedModel } from "./rendering/enemySpinnerInstancedModel";
+import { AnimeOutlinePass } from "./rendering/animeOutlinePass";
+import { WorkshopPreview } from "./rendering/workshopPreview";
+import { WorkshopTilePreviewRenderer } from "./rendering/workshopTilePreviewRenderer";
+import { createAnimeSpinnerVisual, isAnimeSpinnerOutline, type AnimeSpinnerVisual } from "./rendering/animeSpinnerMaterial";
+import {
+  SpinnerModelLoader,
+  isSpinnerModelAssetKey,
+  type LoadedSpinnerModel,
+  type SpinnerModelAssetKey,
+} from "./rendering/spinnerModelLoader";
+import {
+  GameUiController,
+  getResultStatRows,
+  renderWorkshopStyle,
+  renderWorkshopUpgrades,
+  type WorkshopCategory,
+  type WorkshopPreviewSelection,
+} from "./ui/gameUi";
+import { applyWorkshopStageLayout } from "./ui/workshopLayout";
+import { setupMainMenu } from "./ui/mainMenu";
+import {
+  createCombatHud,
+  renderCompactLeaderboard,
+  renderFullLeaderboard,
+  type AbilityHudElements,
+  type LeaderboardViewRow,
+  type RpmHudElements,
+} from "./ui/combatHud";
 
 type SpinnerColors = {
   body: string;
@@ -151,36 +187,13 @@ type DeathmatchVisualState = {
   originalMaterials: FlashMaterialRecord[];
 };
 
-type RpmHudElements = {
-  root: HTMLElement;
-  fill: HTMLElement;
-  cap: HTMLElement;
-  value: HTMLElement;
-  bonusIcons?: HTMLElement;
-};
-
-type DashHudElements = {
-  root: HTMLElement;
-  fill: HTMLElement;
-  value: HTMLElement;
-};
-
-type UltimateHudElements = {
-  root: HTMLElement;
-  fill: HTMLElement;
-  value: HTMLElement;
-};
+type DashHudElements = AbilityHudElements;
+type UltimateHudElements = AbilityHudElements;
 
 type TargetLine = {
   line: THREE.Line;
   geometry: THREE.BufferGeometry;
   positions: Float32Array;
-};
-
-type SolidTrailMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> & {
-  userData: {
-    positions: Float32Array;
-  };
 };
 
 type BotDifficulty = "easy" | "normal" | "hard";
@@ -194,8 +207,7 @@ type SpinnerState = {
   ultimateVfx: TornadoVfx;
   bonusAuraVfxByType: Record<TimedArenaBonusType, TornadoVfx>;
   bonusAuraIntroByType: Record<TimedArenaBonusType, number>;
-  trailMesh: SolidTrailMesh;
-  trailMaterial: THREE.MeshBasicMaterial;
+  trailVisual: SpinnerTrailVisual;
   trailPoints: THREE.Vector3[];
   trailSampleTimer: number;
   trailVisibleStrength: number;
@@ -325,7 +337,7 @@ const lightningChainSettings: LightningChainSettings = {
   baseDamage: defaultElementalSkillSettings.lightningBaseDamage,
   damageStep: defaultElementalSkillSettings.lightningDamageStep,
 };
-const elementOrder: SpinnerElement[] = ["fire", "ice", "earth", "lightning"];
+const elementOrder: SpinnerElement[] = ["fire", "ice", "lightning", "earth"];
 const ultimateAuraPresetByElement: Record<SpinnerElement, TornadoVfxPreset> = {
   fire: fireAuraPreset as TornadoVfxPreset,
   ice: frostAuraPreset as TornadoVfxPreset,
@@ -375,7 +387,8 @@ const elementIconByElement: Record<SpinnerElement, string> = {
   earth: iconGreenUrl,
   lightning: iconYellowUrl,
 };
-let selectedElement: SpinnerElement = "lightning";
+const playerProfile = loadPlayerProfile();
+let selectedElement: SpinnerElement = playerProfile.selectedElement;
 const botCursorMinRadius = 6;
 const botAiSettings: BotAiSettings = {
   globalAttackLimit: 0,
@@ -405,13 +418,12 @@ const botDifficultyPresets: Record<
   hard: { minDecisionTime: 0.2, maxDecisionTime: 0.35, cursorAngularSpeed: Math.PI * 1.55, cursorRadialSpeed: 10 },
 };
 const debugSettingStoragePrefix = "turbo-spin-arena.debug.";
+for (const key of ["light.panelHidden", "light.disabled", "light.ambient", "light.hemisphere", "light.key", "light.fill"]) {
+  localStorage.removeItem(`${debugSettingStoragePrefix}${key}`);
+}
 let spinnerSizeScale = getStoredDebugNumber("spinnerSize", 0.6, 3, 1);
 
-const maxTrailPoints = 28;
-const maxTrailRibbonPoints = (maxTrailPoints + 1) * 2;
-const maxTrailVertices = maxTrailRibbonPoints * 2;
-const maxTrailIndices = (maxTrailRibbonPoints - 1) * 6;
-const spinnerModelUrl = `${import.meta.env.BASE_URL}assets/Spiner.obj`;
+const maxTrailPoints = maxSpinnerTrailPoints;
 const damageNumberFontUrl = `${import.meta.env.BASE_URL}assets/fonts/ZeroCool.woff2`;
 const damageNumberFontFamily = "ZeroCoolDamage";
 const maxRendererPixelRatio = 1.25;
@@ -434,20 +446,29 @@ const cameraSettings = {
   deathLookAtY: 1.1,
   deathLookAtZ: 0,
 };
-const lightSettings = {
-  disabled: false,
-  ambient: 1.55,
-  hemisphere: 0.72,
-  key: 2.35,
-  fill: 0.18,
-};
-
 let elapsedTime = 0;
 let physicsAccumulator = 0;
 let pointerHasWorldTarget = false;
-let spinnerModelSource: THREE.Group | null = null;
+const spinnerModelLoader = new SpinnerModelLoader();
+let defaultSpinnerModel: LoadedSpinnerModel | null = null;
+let playerSpinnerVisual: AnimeSpinnerVisual | null = null;
+let playerSpinnerAssetKey: SpinnerModelAssetKey | null = null;
+let workshopPreviewAssetKey: SpinnerModelAssetKey | null = null;
+let spinnerModelRequestId = 0;
+let matchStartPending = false;
 let mobileMoveActive = false;
 let matchStarted = false;
+type AppScreen = "mainMenu" | "workshop" | "match" | "result";
+let appScreen: AppScreen = "mainMenu";
+let workshopElapsedTime = 0;
+let selectedGameMode: GameMode = "duel";
+let matchTimeRemaining = 0;
+let currentMatchResult: MatchResult | null = null;
+let workshopReturnScreen: "menu" | "result" = "menu";
+let workshopTab: "style" | "tuning" = "style";
+let workshopPreviewSelection: WorkshopPreviewSelection = {};
+let activeMaterialSlot: 0 | 1 | 2 = 0;
+let activeWorkshopCategory: WorkshopCategory = "model";
 let gameLoopStarted = false;
 let deathmatchOverlayOpen = false;
 let deathmatchOverlayOpenedByDeath = false;
@@ -464,6 +485,14 @@ let leaderboardUpdateIntervalId: number | null = null;
 
 const language = detectLanguage(navigator.language);
 const t = createTranslator(language);
+const gameUi = new GameUiController({
+  onStartMatch: () => void startMatch(selectedGameMode),
+  onOpenWorkshop: openWorkshop,
+  onCloseWorkshop: closeWorkshop,
+  onReplay: () => void startMatch(selectedGameMode),
+  onOpenMainMenu: openMainMenu,
+  onClaimDoubleReward: () => void claimDoubleReward(),
+});
 document.documentElement.lang = language;
 document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
 
@@ -475,48 +504,44 @@ camera.position.copy(defaultCameraPosition);
 camera.lookAt(cameraLookAtTarget);
 scene.add(camera);
 
-const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = false;
 document.body.appendChild(renderer.domElement);
+const combatAnimeOutlinePass = new AnimeOutlinePass({
+  outerWidth: 2.5,
+  innerWidth: 0.75,
+  normalThreshold: 0.58,
+  depthThreshold: 0.014,
+  innerOpacity: 0.48,
+  outerOpacity: 1,
+});
+const combatAnimeOutlineViewport = new THREE.Vector4();
+const combatAnimeOutlineTargets: THREE.Object3D[] = [];
+const workshopPreview = new WorkshopPreview();
+const workshopTilePreviewRenderer = new WorkshopTilePreviewRenderer(spinnerModelLoader);
 
-const ambientLight = new THREE.AmbientLight("#ffffff", lightSettings.ambient);
-scene.add(ambientLight);
-const hemisphereLight = new THREE.HemisphereLight("#ffffff", "#ffffff", lightSettings.hemisphere);
-scene.add(hemisphereLight);
-
-const keyLight = new THREE.DirectionalLight("#ffffff", lightSettings.key);
-keyLight.position.set(0, 12, 0);
-keyLight.target.position.set(0, 0, 0);
-keyLight.castShadow = false;
-scene.add(keyLight);
-scene.add(keyLight.target);
-
-const fillLight = new THREE.DirectionalLight("#ffffff", lightSettings.fill);
-fillLight.position.set(0, 8, 0);
-fillLight.target.position.set(0, 0, 0);
-fillLight.castShadow = false;
-scene.add(fillLight);
-scene.add(fillLight.target);
-
-const arena = activeArena.createSceneObjects();
+let arena = activeArena.createSceneObjects();
 scene.add(arena);
-const arenaBonusState = createArenaBonusState(activeArena.interestPoints);
+const arenaGroups = new Map<GameMode, THREE.Group>([["duel", arena]]);
+const arenaMarkerGroups = new Map<GameMode, THREE.Group>();
+let arenaBonusState = createArenaBonusState(activeArena.interestPoints);
 const arenaBonusVfxPool = new BonusVfxPool(scene, arenaBonusColorByType, reducedMotionQuery);
 arenaBonusVfxPool.prewarm({ particles: 160, pulses: 36 });
 const enemySpinnerInstancedModel = new EnemySpinnerInstancedModel(scene, 9);
-const sparkVfxPool = new SparkVfxPool(scene, reducedMotionQuery);
 const damageNumberPool = new DamageNumberPool(scene, damageNumberFontFamily, () => damageNumberFontReady);
 prewarmHealingZones();
 prewarmHealAuraBursts();
-scene.add(createArenaBonusPointMarkers());
+let arenaBonusPointMarkers = createArenaBonusPointMarkers();
+arenaMarkerGroups.set("duel", arenaBonusPointMarkers);
+scene.add(arenaBonusPointMarkers);
 
 const player = createSpinner({
   name: "Player",
   colors: {
-    body: "#243a75",
+    body: "#3f72e5",
     cone: "#d9f6ff",
     cap: "#f5f0d8",
     blur: "#64d6ff",
@@ -545,6 +570,7 @@ let dashHudElements: DashHudElements | null = null;
 let ultimateHudElements: UltimateHudElements | null = null;
 let mobileControls: MobileControls | null = null;
 const deathmatchLeaderboardElement = document.querySelector<HTMLElement>("[data-deathmatch-leaderboard]");
+const compactLeaderboardElement = document.querySelector<HTMLElement>("[data-compact-leaderboard]");
 const deathmatchOverlayElement = document.querySelector<HTMLElement>("[data-deathmatch-overlay]");
 const deathmatchScoreboardButton = document.querySelector<HTMLButtonElement>("[data-deathmatch-scoreboard]");
 const deathmatchContinueButton = document.querySelector<HTMLButtonElement>("[data-deathmatch-continue]");
@@ -554,22 +580,39 @@ let botAiDecisionCountdown = 0;
 let botAiDecisionElapsedTime = 0;
 
 scene.add(player.group);
-scene.add(player.trailMesh);
+scene.add(player.trailVisual.group);
 player.targetLine = createTargetLine("#ffffff", 0.95, 4);
 scene.add(player.targetLine.line);
 loadDamageNumberFont();
-loadCustomSpinnerModel();
+void loadCustomSpinnerModel();
 player.targetPosition.copy(player.group.position);
 setEnemyCount(1);
 hudElements = createRpmHud(player, enemySpinners);
 setupSettingTooltips();
-setupEnemyCountControl();
 setupSpinnerSizeControl();
 setupBotDifficultyControls();
-setupLightControls();
-setupStartMenu();
+setupMainMenu({
+  initialMode: selectedGameMode,
+  devMode: import.meta.env.DEV,
+  t,
+  onModeSelected: (mode) => {
+    selectedGameMode = mode;
+  },
+  onClaimFreeChest: () => {
+    const reward = 100;
+    addParts(playerProfile, reward);
+    gameUi.updateCurrency(playerProfile.parts);
+    return reward;
+  },
+});
+fpsCounterElement?.toggleAttribute("hidden", !import.meta.env.DEV);
 setupDeathmatchContinueButton();
 setupMobileControls();
+setupGameScreens();
+updateWorkshopStageLayout();
+applyPlayerProgression();
+applyPlayerAppearance();
+startGameLoop();
 
 renderer.domElement.addEventListener("pointermove", handlePointer);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
@@ -599,48 +642,81 @@ function runGameFrame(): void {
   const frameDeltaTime = Math.min(clock.getDelta(), 0.1);
   updateFpsCounter(frameDeltaTime);
 
-  physicsAccumulator += frameDeltaTime;
-
-  let physicsSteps = 0;
-  while (physicsAccumulator >= fixedPhysicsDelta && physicsSteps < maxPhysicsStepsPerFrame) {
-    simulatePhysicsTick(fixedPhysicsDelta);
-    physicsAccumulator -= fixedPhysicsDelta;
-    physicsSteps += 1;
+  if (appScreen === "workshop") {
+    workshopElapsedTime += frameDeltaTime;
+    workshopPreview.update(frameDeltaTime, workshopElapsedTime);
+    const previewPanel = document.querySelector<HTMLElement>("[data-workshop-preview]");
+    const previewRect = previewPanel?.getBoundingClientRect();
+    const previewWidth = previewRect?.width ?? window.innerWidth * 0.4;
+    const previewHeight = previewRect?.height ?? window.innerHeight;
+    const previewX = previewRect?.left ?? 0;
+    const previewY = previewRect ? window.innerHeight - previewRect.bottom : 0;
+    workshopPreview.resize(previewWidth, previewHeight, previewX, previewY);
+    workshopPreview.render(renderer);
+    workshopTilePreviewRenderer.updateAndRender(frameDeltaTime, workshopElapsedTime, workshopTab === "style");
+    return;
   }
 
-  if (physicsSteps === maxPhysicsStepsPerFrame) {
-    physicsAccumulator = 0;
-  }
+  workshopTilePreviewRenderer.updateAndRender(0, 0, false);
 
-  updateCritReadyVfx(frameDeltaTime);
-  updateUltimateVfx(frameDeltaTime);
-  updateLightningChainVfx(frameDeltaTime);
-  elementalSkillVfx.update(frameDeltaTime, elapsedTime, camera);
-  updateBonusAuraVfx(frameDeltaTime);
-  updateDeathmatchProtectedVisuals(frameDeltaTime);
-  updateHealAuraBursts(frameDeltaTime);
-  updateArenaBonusVisuals(frameDeltaTime);
-  if (isDeathmatchAlive(player)) {
-    updateSolidTrail(player);
-    updateTargetLine(player);
-  } else {
-    hideSpinnerTrailAndTarget(player);
-  }
-  for (const spinner of enemySpinners) {
-    if (isDeathmatchAlive(spinner)) {
-      updateSolidTrail(spinner);
-    } else {
-      hideSpinnerTrailAndTarget(spinner);
+  if (appScreen === "match" && matchStarted) {
+    physicsAccumulator += frameDeltaTime;
+
+    let physicsSteps = 0;
+    while (physicsAccumulator >= fixedPhysicsDelta && physicsSteps < maxPhysicsStepsPerFrame) {
+      simulatePhysicsTick(fixedPhysicsDelta);
+      physicsAccumulator -= fixedPhysicsDelta;
+      physicsSteps += 1;
     }
+
+    if (physicsSteps === maxPhysicsStepsPerFrame) {
+      physicsAccumulator = 0;
+    }
+    updateCritReadyVfx(frameDeltaTime);
+    updateUltimateVfx(frameDeltaTime);
+    updateLightningChainVfx(frameDeltaTime);
+    elementalSkillVfx.update(frameDeltaTime, elapsedTime, camera);
+    updateBonusAuraVfx(frameDeltaTime);
+    updateDeathmatchProtectedVisuals(frameDeltaTime);
+    updateHealAuraBursts(frameDeltaTime);
+    updateArenaBonusVisuals(frameDeltaTime);
+    if (isDeathmatchAlive(player)) {
+      updateSolidTrail(player);
+      updateTargetLine(player);
+    } else {
+      hideSpinnerTrailAndTarget(player);
+    }
+    for (const spinner of enemySpinners) {
+      if (isDeathmatchAlive(spinner)) updateSolidTrail(spinner);
+      else hideSpinnerTrailAndTarget(spinner);
+    }
+    damageNumberPool.update(frameDeltaTime);
+    updateDeathCamera(frameDeltaTime);
+    for (const spinner of enemySpinners) enemySpinnerInstancedModel.setFrozen(spinner, spinner.elementalMovementLocked);
+    enemySpinnerInstancedModel.sync(enemySpinners, frameDeltaTime);
   }
-  damageNumberPool.update(frameDeltaTime);
-  updateDeathCamera(frameDeltaTime);
-  for (const spinner of enemySpinners) {
-    enemySpinnerInstancedModel.setFrozen(spinner, spinner.elementalMovementLocked);
-  }
-  enemySpinnerInstancedModel.sync(enemySpinners, frameDeltaTime);
 
   renderer.render(scene, camera);
+  if (appScreen === "match") {
+    const outlineTargets = collectCombatAnimeOutlineTargets();
+    if (import.meta.env.DEV) renderer.domElement.dataset.animeOutlineTargets = String(outlineTargets.length);
+    renderer.getViewport(combatAnimeOutlineViewport);
+    combatAnimeOutlinePass.render(renderer, scene, camera, outlineTargets, {
+      x: combatAnimeOutlineViewport.x,
+      y: combatAnimeOutlineViewport.y,
+      width: combatAnimeOutlineViewport.z,
+      height: combatAnimeOutlineViewport.w,
+    });
+  }
+}
+
+function collectCombatAnimeOutlineTargets(): THREE.Object3D[] {
+  combatAnimeOutlineTargets.length = 0;
+  if (playerSpinnerVisual?.root.userData.spinnerScreenOutline === true) {
+    combatAnimeOutlineTargets.push(playerSpinnerVisual.root);
+  }
+  combatAnimeOutlineTargets.push(...enemySpinnerInstancedModel.getOutlineTargets());
+  return combatAnimeOutlineTargets;
 }
 
 function updateCritReadyVfx(deltaTime: number): void {
@@ -740,6 +816,18 @@ function updateHudSystems(): void {
   updateUltimateHud(ultimateHudElements);
   updateMobileControls();
   updateDeathmatchContinueButton();
+  const timer = document.querySelector<HTMLElement>("[data-match-timer]");
+  if (timer) {
+    timer.hidden = selectedGameMode !== "deathmatch";
+    const seconds = Math.ceil(matchTimeRemaining);
+    timer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+  if (compactLeaderboardElement) {
+    compactLeaderboardElement.hidden = selectedGameMode !== "deathmatch";
+    if (selectedGameMode === "deathmatch") {
+      renderCompactLeaderboard(compactLeaderboardElement, getLeaderboardViewRows(), t);
+    }
+  }
 }
 
 function updateOpenDeathmatchLeaderboard(): void {
@@ -759,21 +847,9 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   const spinGroup = new THREE.Group();
   group.add(spinGroup);
 
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: options.colors.body,
-    roughness: 0.38,
-    metalness: 0.2,
-  });
-  const coneMaterial = new THREE.MeshStandardMaterial({
-    color: options.colors.cone,
-    roughness: 0.32,
-    metalness: 0.18,
-  });
-  const capMaterial = new THREE.MeshStandardMaterial({
-    color: options.colors.cap,
-    roughness: 0.34,
-    metalness: 0.28,
-  });
+  const bodyMaterial = new THREE.MeshBasicMaterial({ color: options.colors.body });
+  const coneMaterial = new THREE.MeshBasicMaterial({ color: options.colors.cone });
+  const capMaterial = new THREE.MeshBasicMaterial({ color: options.colors.cap });
 
   const cone = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.5, 32), coneMaterial);
   cone.position.y = 0.25;
@@ -797,11 +873,7 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   const panelGeometry = new THREE.BoxGeometry(0.2, 0.28, 0.055);
   for (let i = 0; i < panelCount; i += 1) {
     const angle = (i / panelCount) * Math.PI * 2;
-    const material = new THREE.MeshStandardMaterial({
-      color: options.colors.panels[i],
-      roughness: 0.45,
-      metalness: 0.1,
-    });
+    const material = new THREE.MeshBasicMaterial({ color: options.colors.panels[i] });
     const panel = new THREE.Mesh(panelGeometry, material);
     panel.position.set(Math.cos(angle) * 0.55, 0.66, Math.sin(angle) * 0.55);
     panel.rotation.y = -angle;
@@ -812,7 +884,7 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   topWedges.position.y = 1.035;
   spinGroup.add(topWedges);
 
-  const { trailMesh, trailMaterial } = createSolidTrail("#ffffff");
+  const trailVisual = new SpinnerTrailVisual("#ffffff");
   const critReadyVfx = new TornadoVfx(critSpeedReadyAuraPreset as TornadoVfxPreset);
   critReadyVfx.group.visible = false;
   group.add(critReadyVfx.group);
@@ -836,8 +908,7 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
     ultimateVfx,
     bonusAuraVfxByType,
     bonusAuraIntroByType: createBonusAuraIntroByType(),
-    trailMesh,
-    trailMaterial,
+    trailVisual,
     trailPoints: [options.position.clone()],
     trailSampleTimer: 0,
     trailVisibleStrength: 0,
@@ -939,7 +1010,7 @@ function createEnemySpinner(index: number): SpinnerState {
   const enemySpinner = createSpinner({
     name: `Enemy ${index + 1}`,
     colors: {
-      body: "#5c1f26",
+      body: "#d14a50",
       cone: "#ffeecc",
       cap: "#f08a34",
       blur: "#ff3f8e",
@@ -967,8 +1038,8 @@ function setEnemyCount(count: number): void {
     const enemySpinner = createEnemySpinner(enemySpinners.length);
     enemySpinners.push(enemySpinner);
     combatSpinners.push(enemySpinner);
-    scene.add(enemySpinner.group, enemySpinner.trailMesh);
-    if (spinnerModelSource) {
+    scene.add(enemySpinner.group, enemySpinner.trailVisual.group);
+    if (defaultSpinnerModel) {
       installInstancedEnemySpinnerModel(enemySpinner);
     }
   }
@@ -999,7 +1070,7 @@ function setEnemyCount(count: number): void {
 function disposeSpinner(spinner: SpinnerState): void {
   finishSpinnerFlash(spinner);
   finishDeathmatchProtectedVisual(spinner);
-  scene.remove(spinner.group, spinner.trailMesh);
+  scene.remove(spinner.group, spinner.trailVisual.group);
   if (spinner.targetLine) {
     scene.remove(spinner.targetLine.line);
     spinner.targetLine.geometry.dispose();
@@ -1016,8 +1087,7 @@ function disposeSpinner(spinner: SpinnerState): void {
   for (const bonusAuraVfx of Object.values(spinner.bonusAuraVfxByType)) {
     bonusAuraVfx.dispose();
   }
-  spinner.trailMesh.geometry.dispose();
-  spinner.trailMaterial.dispose();
+  spinner.trailVisual.dispose();
 }
 
 function updateBotAttackLimits(): void {
@@ -1028,22 +1098,43 @@ function clearPairImpactTimes(): void {
   resetCombatState();
 }
 
-function loadCustomSpinnerModel(): void {
-  new OBJLoader().load(
-    spinnerModelUrl,
-    (source) => {
-      spinnerModelSource = source;
-      installCustomSpinnerModel(player, source.clone(true));
-      enemySpinnerInstancedModel.setModelSource(source, enemySpinners[0]?.baseRadius ?? player.baseRadius);
-      for (const spinner of enemySpinners) {
-        installInstancedEnemySpinnerModel(spinner);
-      }
-    },
-    undefined,
-    (error) => {
-      console.error(`Failed to load ${spinnerModelUrl}`, error);
-    },
-  );
+async function loadCustomSpinnerModel(): Promise<void> {
+  try {
+    defaultSpinnerModel = await spinnerModelLoader.load("spinner2");
+    enemySpinnerInstancedModel.setModelSource(
+      defaultSpinnerModel.source,
+      defaultSpinnerModel.asset,
+      enemySpinners[0]?.baseRadius ?? player.baseRadius,
+    );
+    for (const spinner of enemySpinners) installInstancedEnemySpinnerModel(spinner);
+    await applySelectedSpinnerModel(false);
+  } catch (error) {
+    console.error("Failed to load the default spinner model", error);
+  }
+}
+
+async function applySelectedSpinnerModel(showFailureToast = true): Promise<void> {
+  const requestId = ++spinnerModelRequestId;
+  const catalogItem = modelCatalog.find((item) => item.id === playerProfile.selectedModel);
+  const requestedAssetKey = isSpinnerModelAssetKey(catalogItem?.assetKey) ? catalogItem.assetKey : "spinner2";
+  let loaded: LoadedSpinnerModel;
+  try {
+    loaded = await spinnerModelLoader.load(requestedAssetKey);
+  } catch (error) {
+    console.error(`Failed to load spinner model ${requestedAssetKey}`, error);
+    if (showFailureToast) showToast(t("workshop.modelLoadFailed"));
+    loaded = await spinnerModelLoader.load("spinner2");
+  }
+  if (requestId !== spinnerModelRequestId) return;
+
+  if (playerSpinnerAssetKey !== loaded.asset.key || !playerSpinnerVisual) {
+    installCustomSpinnerModel(player, loaded);
+  }
+  if (workshopPreviewAssetKey !== loaded.asset.key) {
+    workshopPreview.setModelSource(loaded.source, loaded.asset);
+    workshopPreviewAssetKey = loaded.asset.key;
+  }
+  applyPlayerAppearance();
 }
 
 function installInstancedEnemySpinnerModel(spinner: SpinnerState): void {
@@ -1066,37 +1157,24 @@ function loadDamageNumberFont(): void {
     });
 }
 
-function installCustomSpinnerModel(spinner: SpinnerState, model: THREE.Group): void {
+function installCustomSpinnerModel(spinner: SpinnerState, loaded: LoadedSpinnerModel): void {
   finishSpinnerFlash(spinner);
+  if (playerSpinnerVisual) {
+    spinner.spinGroup.remove(playerSpinnerVisual.root);
+    playerSpinnerVisual.dispose();
+    playerSpinnerVisual = null;
+  }
   disposeObjectChildren(spinner.spinGroup);
-
-  const box = new THREE.Box3().setFromObject(model);
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const diameter = Math.max(size.x, size.y);
-  const height = size.z;
-  const scale = diameter > 0 ? (spinner.baseRadius * 1.65) / diameter : 1;
-
-  model.name = `${spinner.name} Custom Model`;
-  model.position.sub(center);
-  model.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.material = new THREE.MeshStandardMaterial({
-        color: spinner.modelColor,
-        roughness: 0.38,
-        metalness: 0.22,
-      });
-      child.geometry.computeVertexNormals();
-    }
-  });
-
-  const modelRoot = new THREE.Group();
-  modelRoot.name = `${spinner.name} Model Root`;
-  modelRoot.rotation.x = -Math.PI / 2;
-  modelRoot.position.y = (height * scale) / 2;
-  modelRoot.scale.setScalar(scale);
-  modelRoot.add(model);
-  spinner.spinGroup.add(modelRoot);
+  playerSpinnerVisual = createAnimeSpinnerVisual(
+    loaded.source,
+    loaded.asset.rotationX,
+    spinner.baseRadius * 1.65,
+    getSelectedMaterialColorValues(),
+    loaded.asset.outline,
+  );
+  playerSpinnerVisual.root.name = `${spinner.name} Model Root`;
+  spinner.spinGroup.add(playerSpinnerVisual.root);
+  playerSpinnerAssetKey = loaded.asset.key;
 }
 
 function disposeObjectChildren(group: THREE.Group): void {
@@ -1141,55 +1219,13 @@ function createTopWedges(colors: string[]): THREE.Group {
 
     const wedge = new THREE.Mesh(
       new THREE.ShapeGeometry(shape),
-      new THREE.MeshStandardMaterial({
-        color: colors[i],
-        roughness: 0.42,
-        metalness: 0.08,
-        side: THREE.DoubleSide,
-      }),
+      new THREE.MeshBasicMaterial({ color: colors[i], side: THREE.DoubleSide }),
     );
     wedge.rotation.x = -Math.PI / 2;
     group.add(wedge);
   }
 
   return group;
-}
-
-function createSolidTrail(color: string): { trailMesh: SolidTrailMesh; trailMaterial: THREE.MeshBasicMaterial } {
-  const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(maxTrailVertices * 3);
-  const indices = new Uint16Array(maxTrailIndices);
-  for (let i = 0; i < maxTrailRibbonPoints - 1; i += 1) {
-    const vertex = i * 2;
-    const index = i * 6;
-    indices[index] = vertex;
-    indices[index + 1] = vertex + 2;
-    indices[index + 2] = vertex + 1;
-    indices[index + 3] = vertex + 1;
-    indices[index + 4] = vertex + 2;
-    indices[index + 5] = vertex + 3;
-  }
-
-  const positionAttribute = new THREE.BufferAttribute(positions, 3);
-  positionAttribute.setUsage(THREE.DynamicDrawUsage);
-  geometry.setAttribute("position", positionAttribute);
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.setDrawRange(0, 0);
-
-  const trailMaterial = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-  });
-  const trailMesh = new THREE.Mesh(geometry, trailMaterial) as SolidTrailMesh;
-  trailMesh.renderOrder = 1;
-  trailMesh.frustumCulled = false;
-  trailMesh.userData.positions = positions;
-
-  return { trailMesh, trailMaterial };
 }
 
 function createTargetLine(color: string, opacity: number, renderOrder: number): TargetLine {
@@ -1216,119 +1252,10 @@ function createTargetLine(color: string, opacity: number, renderOrder: number): 
 }
 
 function createRpmHud(playerSpinner: SpinnerState, enemySpinnerList: SpinnerState[]): RpmHudElements[] {
-  const elements: RpmHudElements[] = [];
-  const playerRoot = document.querySelector<HTMLElement>("[data-player-rpm]");
-  const enemyRoot = document.querySelector<HTMLElement>("[data-enemy-rpms]");
-
-  if (playerRoot) {
-    playerRoot.replaceChildren();
-    elements.push(createRpmCard(playerRoot, playerSpinner, "player"));
-    dashHudElements = createDashHud(playerRoot);
-    ultimateHudElements = createUltimateHud(playerRoot);
-  } else {
-    dashHudElements = null;
-    ultimateHudElements = null;
-  }
-
-  if (enemyRoot) {
-    enemyRoot.replaceChildren();
-    for (const enemySpinner of enemySpinnerList.slice(0, 9)) {
-      elements.push(createRpmCard(enemyRoot, enemySpinner, "enemy"));
-    }
-  }
-
-  return elements;
-}
-
-function createRpmCard(root: HTMLElement, spinner: SpinnerState, variant: "player" | "enemy"): RpmHudElements {
-  const card = document.createElement("div");
-  card.className = `rpm-card ${variant}`;
-
-  const label = document.createElement("div");
-  label.className = "rpm-label";
-
-  const name = document.createElement("span");
-  name.textContent = spinner.name;
-
-  const value = document.createElement("span");
-  value.textContent = `${Math.ceil(spinner.currentRPM)} / ${Math.ceil(spinner.maxRPM)} RPM`;
-
-  const track = document.createElement("div");
-  track.className = "rpm-track";
-
-  const cap = document.createElement("div");
-  cap.className = "rpm-cap";
-
-  const fill = document.createElement("div");
-  fill.className = "rpm-fill";
-
-  label.append(name, value);
-  track.append(cap, fill);
-  let bonusIcons: HTMLElement | undefined;
-  if (variant === "player") {
-    bonusIcons = document.createElement("div");
-    bonusIcons.className = "bonus-icons";
-    bonusIcons.hidden = true;
-    card.append(bonusIcons);
-  }
-  card.append(label, track);
-  root.append(card);
-
-  return { root: card, fill, cap, value, bonusIcons };
-}
-
-function createDashHud(root: HTMLElement): DashHudElements {
-  const card = document.createElement("div");
-  card.className = "dash-card";
-
-  const label = document.createElement("div");
-  label.className = "dash-label";
-
-  const name = document.createElement("span");
-  name.textContent = t("hud.dash");
-
-  const value = document.createElement("span");
-  value.textContent = t("hud.ready").toUpperCase();
-
-  const track = document.createElement("div");
-  track.className = "dash-track";
-
-  const fill = document.createElement("div");
-  fill.className = "dash-fill";
-
-  label.append(name, value);
-  track.append(fill);
-  card.append(label, track);
-  root.append(card);
-
-  return { root: card, fill, value };
-}
-
-function createUltimateHud(root: HTMLElement): UltimateHudElements {
-  const card = document.createElement("div");
-  card.className = "ultimate-card";
-
-  const label = document.createElement("div");
-  label.className = "ultimate-label";
-
-  const name = document.createElement("span");
-  name.textContent = t("hud.ultimate");
-
-  const value = document.createElement("span");
-  value.textContent = "0%";
-
-  const track = document.createElement("div");
-  track.className = "ultimate-track";
-
-  const fill = document.createElement("div");
-  fill.className = "ultimate-fill";
-
-  label.append(name, value);
-  track.append(fill);
-  card.append(label, track);
-  root.append(card);
-
-  return { root: card, fill, value };
+  const hud = createCombatHud(playerSpinner, enemySpinnerList, selectedGameMode, t);
+  dashHudElements = hud.dash;
+  ultimateHudElements = hud.ultimate;
+  return hud.rpm;
 }
 
 function setupSettingTooltips(): void {
@@ -1426,39 +1353,444 @@ function applySpinnerSizeScale(scale: number): void {
   }
 }
 
-function setupStartMenu(): void {
-  const menu = document.querySelector<HTMLElement>("[data-start-menu]");
-  const startButton = document.querySelector<HTMLButtonElement>("[data-start-match]");
-  document.body.classList.toggle("match-started", matchStarted);
-  document.body.style.setProperty("--menu-background", `url("${backgroundImageUrl}")`);
+async function startMatch(mode: GameMode): Promise<void> {
+  if (matchStartPending) return;
+  matchStartPending = true;
+  setMatchStartButtonsDisabled(true);
+  try {
+    await applySelectedSpinnerModel();
+  } catch (error) {
+    console.error("Failed to prepare spinner model for match", error);
+    showToast(t("workshop.modelLoadFailed"));
+    return;
+  } finally {
+    matchStartPending = false;
+    setMatchStartButtonsDisabled(false);
+  }
+  resetCombatVisualState();
+  selectedGameMode = mode;
+  switchArena(mode);
+  setEnemyCount(mode === "deathmatch" ? 9 : 1);
+  resetMatchState();
+  arena.visible = true;
+  arenaBonusPointMarkers.visible = true;
+  applySpinnerSizeScale(spinnerSizeScale);
+  matchTimeRemaining = mode === "deathmatch" ? 180 : 0;
+  matchStarted = true;
+  appScreen = "match";
+  currentMatchResult = null;
+  physicsAccumulator = 0;
+  pointerHasWorldTarget = false;
+  mobileControls?.reset();
+  gameUi.showMatch(mode);
+  if (deathmatchScoreboardButton) deathmatchScoreboardButton.hidden = mode !== "deathmatch";
+  updateHudSystems();
+  startUiUpdateTimers();
+}
 
-  for (const element of elementOrder) {
-    const button = document.querySelector<HTMLButtonElement>(`[data-element-choice="${element}"]`);
-    const image = button?.querySelector<HTMLImageElement>("img");
-    if (!button || !image) {
-      continue;
+function setMatchStartButtonsDisabled(disabled: boolean): void {
+  gameUi.setBusy(disabled);
+}
+
+function switchArena(mode: GameMode): void {
+  const definition = mode === "deathmatch" ? deathmatchArena : duelArena;
+  scene.remove(arena, arenaBonusPointMarkers);
+  setActiveArena(definition);
+  let nextArena = arenaGroups.get(mode);
+  if (!nextArena) {
+    nextArena = definition.createSceneObjects();
+    arenaGroups.set(mode, nextArena);
+  }
+  arena = nextArena;
+  scene.add(arena);
+  arenaBonusState = createArenaBonusState(definition.interestPoints);
+  let markers = arenaMarkerGroups.get(mode);
+  if (!markers) {
+    markers = createArenaBonusPointMarkers();
+    arenaMarkerGroups.set(mode, markers);
+  }
+  arenaBonusPointMarkers = markers;
+  scene.add(markers);
+  pointerFallbackPlane.constant = -definition.getHeightAt(definition.radius, 0);
+  const cameraPosition = mode === "deathmatch" ? new THREE.Vector3(0, 25, 25) : new THREE.Vector3(cameraSettings.gameX, cameraSettings.gameY, cameraSettings.gameZ);
+  const lookAt = mode === "deathmatch" ? new THREE.Vector3(0, -3.5, 0) : new THREE.Vector3(cameraSettings.lookAtX, cameraSettings.lookAtY, cameraSettings.lookAtZ);
+  defaultCameraPosition.copy(cameraPosition);
+  defaultCameraLookAt.copy(lookAt);
+  camera.position.copy(cameraPosition);
+  cameraLookAtTarget.copy(lookAt);
+  camera.lookAt(lookAt);
+}
+
+function resetMatchState(): void {
+  closeDeathmatchOverlay();
+  resetCombatState();
+  deathCameraActive = false;
+  deathCameraReturning = false;
+  elapsedTime = 0;
+  player.group.position.copy(activeArena.playerStart);
+  resetParticipant(player, true);
+  for (let index = 0; index < enemySpinners.length; index += 1) {
+    const enemy = enemySpinners[index];
+    enemy.group.position.copy(activeArena.enemySpawns[index % activeArena.enemySpawns.length]);
+    resetParticipant(enemy, false);
+    botAiDirector.forget(enemy);
+  }
+  applyPlayerProgression();
+  applyPlayerAppearance();
+  hudElements = createRpmHud(player, enemySpinners);
+}
+
+function resetCombatVisualState(): void {
+  arenaBonusVfxPool.reset();
+  damageNumberPool.reset();
+  elementalSkillVfx.reset(camera);
+  lightningChainVfx.reset(camera);
+
+  for (const frozenTarget of resetElementalSkillState(elementalSkillState, enemySpinners)) {
+    enemySpinnerInstancedModel.setFrozen(frozenTarget, false);
+  }
+  syncElementalCollisionModifiers(player, selectedElement, false);
+
+  for (const spinner of combatSpinners) {
+    finishSpinnerFlash(spinner);
+    finishDeathmatchProtectedVisual(spinner);
+    spinner.modelTint = null;
+    spinner.spinGroup.visible = true;
+    spinner.bonusEffects.length = 0;
+    spinner.critReadyVfx.group.visible = false;
+    spinner.ultimateVfx.group.visible = false;
+    for (const type of arenaBonusTypes) {
+      spinner.bonusAuraVfxByType[type].group.visible = false;
+      spinner.bonusAuraVfxByType[type].group.scale.setScalar(1);
+      spinner.bonusAuraIntroByType[type] = 0;
     }
-    image.src = elementIconByElement[element];
-    const label = t(`element.${element}`);
-    button.setAttribute("aria-label", label);
-    button.title = label;
-    button.addEventListener("click", () => setSelectedElement(element));
+    clearSpinnerTrail(spinner);
+    hideSpinnerTrailAndTarget(spinner);
+    enemySpinnerInstancedModel.setFrozen(spinner, false);
   }
 
-  applyMenuTranslations();
-  setSelectedElement(selectedElement);
+  while (healAuraBursts.length > 0) {
+    const burst = healAuraBursts.pop()!;
+    burst.parent.remove(burst.vfx.group);
+    releaseHealAuraVfx(burst.vfx);
+  }
+  latestEnemyAiCommands.clear();
+}
 
-  startButton?.addEventListener("click", () => {
-    matchStarted = true;
-    physicsAccumulator = 0;
-    pointerHasWorldTarget = false;
-    mobileControls?.reset();
-    menu?.setAttribute("hidden", "");
-    document.body.classList.add("match-started");
-    updateHudSystems();
-    startUiUpdateTimers();
-    startGameLoop();
+function resetParticipant(spinner: SpinnerState, isPlayer: boolean): void {
+  spinner.deathmatchStatus = "alive";
+  spinner.respawnTimer = 0;
+  spinner.invulnerabilityTimer = 0;
+  spinner.kills = 0;
+  spinner.deaths = 0;
+  spinner.playerCriticalHits = 0;
+  spinner.absoluteMaxRPM = absoluteMaxRPM;
+  spinner.maxRPM = absoluteMaxRPM;
+  spinner.currentRPM = absoluteMaxRPM;
+  spinner.velocity.set(0, 0, 0);
+  spinner.knockback.active = false;
+  spinner.respawnDash.active = false;
+  spinner.dash.activeTimeRemaining = 0;
+  spinner.dash.cooldownRemaining = 0;
+  spinner.ultimate.charge = 0;
+  spinner.ultimate.activeTimeRemaining = 0;
+  spinner.bonusEffects.length = 0;
+  spinner.bonusSpeedMultiplier = 1;
+  spinner.damageMultiplier = 1;
+  spinner.incomingDamageMultiplier = 1;
+  spinner.collisionDamageMultiplier = 1;
+  spinner.collisionKnockbackMultiplier = 1;
+  spinner.elementalMovementLocked = false;
+  spinner.verticalLaunchActive = false;
+  spinner.grounded = true;
+  spinner.heightOffset = 0;
+  clearSpinnerTrail(spinner);
+  setSpinnerTarget(spinner, spinner.group.position, spinner.group.position);
+  spinner.lastPosition.copy(spinner.group.position);
+  spinner.previousTrailPosition.copy(spinner.group.position);
+  if (!isPlayer) {
+    spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.group.position));
+    spinner.botDesiredCursorPosition.copy(spinner.botVirtualCursorPosition);
+  }
+}
+
+function applyPlayerProgression(): void {
+  const rpmMultiplier = getUpgradeValue("maxRpm", playerProfile.upgrades.maxRpm);
+  player.absoluteMaxRPM = Math.round(absoluteMaxRPM * rpmMultiplier);
+  player.maxRPM = player.absoluteMaxRPM;
+  player.currentRPM = player.absoluteMaxRPM;
+  player.damageMultiplier = getUpgradeValue("damage", playerProfile.upgrades.damage);
+  player.dash.settings.cooldown = getUpgradeValue("dash", playerProfile.upgrades.dash);
+  const ultimateMultiplier = getUpgradeValue("ultimate", playerProfile.upgrades.ultimate);
+  player.ultimate.settings.passiveChargePerSecond = ultimateChargeSettings.passiveChargePerSecond * ultimateMultiplier;
+  player.ultimate.settings.chargePerDamageDealt = ultimateChargeSettings.chargePerDamageDealt * ultimateMultiplier;
+  player.ultimate.settings.chargePerDamageTaken = ultimateChargeSettings.chargePerDamageTaken * ultimateMultiplier;
+}
+
+function applyPlayerAppearance(): void {
+  const colors = getSelectedMaterialColorValues();
+  const trail = trailCatalog.find((item) => item.id === playerProfile.selectedTrail)?.color ?? "#ffffff";
+  player.modelColor = colors[0];
+  player.colorAccent = trail;
+  player.trailVisual.setColor(trail);
+  workshopPreview.setColors(colors);
+  workshopPreview.setTrailColor(trail);
+  playerSpinnerVisual?.setColors(colors);
+  setSelectedElement(playerProfile.selectedElement);
+  applySelectedCritAura();
+}
+
+function getSelectedMaterialColorValues(): [string, string, string] {
+  return playerProfile.selectedMaterialColors.map((selectedId) =>
+    colorCatalog.find((item) => item.id === selectedId)?.color ?? "#3f72e5",
+  ) as [string, string, string];
+}
+
+function applySelectedCritAura(): void {
+  player.critReadyVfx.applyPreset(cosmeticAuraPresetById[playerProfile.selectedAura] ?? cosmeticAuraPresetById.aura_crit);
+}
+
+function setupGameScreens(): void {
+  updatePartsBalances();
+  gameUi.bind();
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workshop-tab]")) {
+    tab.addEventListener("click", () => {
+      workshopTab = tab.dataset.workshopTab === "tuning" ? "tuning" : "style";
+      renderWorkshop();
+    });
+  }
+  setupWorkshopPreviewInput();
+}
+
+function openWorkshop(returnScreen: "menu" | "result"): void {
+  workshopReturnScreen = returnScreen;
+  workshopPreviewSelection = {};
+  activeWorkshopCategory = "model";
+  gameUi.showWorkshop();
+  appScreen = "workshop";
+  workshopElapsedTime = 0;
+  restoreWorkshopPreview();
+  renderWorkshop();
+}
+
+function closeWorkshop(): void {
+  workshopPreviewSelection = {};
+  restoreWorkshopPreview();
+  if (workshopReturnScreen === "result" && currentMatchResult) showResultScreen();
+  else openMainMenu();
+}
+
+function renderWorkshop(): void {
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workshop-tab]")) {
+    tab.classList.toggle("active", tab.dataset.workshopTab === workshopTab);
+  }
+  const root = document.querySelector<HTMLElement>("[data-workshop-content]");
+  if (!root) return;
+  if (workshopTab === "tuning") {
+    renderWorkshopUpgrades({
+      root,
+      profile: playerProfile,
+      t,
+      onUpgrade: (id) => {
+        if (!purchaseUpgrade(playerProfile, id)) showToast(t("workshop.insufficient"));
+        applyPlayerProgression();
+        renderWorkshop();
+      },
+    });
+  } else {
+    renderWorkshopStyle({
+      root,
+      profile: playerProfile,
+      items: cosmeticCatalog,
+      previewSelection: workshopPreviewSelection,
+      elements: elementOrder,
+      activeMaterialSlot,
+      activeCategory: activeWorkshopCategory,
+      t,
+      onSelectCategory: (category) => {
+        activeWorkshopCategory = category;
+        renderWorkshop();
+      },
+      onSelectElement: (element) => {
+        playerProfile.selectedElement = element;
+        savePlayerProfile(playerProfile);
+        applyPlayerAppearance();
+        workshopPreview.flashElement(element);
+        renderWorkshop();
+      },
+      onSelectMaterialSlot: (slot) => {
+        activeMaterialSlot = slot;
+        workshopPreviewSelection.color = playerProfile.selectedMaterialColors[slot];
+        workshopPreview.setColors(getSelectedMaterialColorValues());
+        renderWorkshop();
+      },
+      onPreview: (item) => void previewCatalogItem(item),
+      onEquip: equipCatalogItem,
+      onBuy: (item, payment) => void buyCatalogItem(item, payment),
+      onOffer: (productId) => void buyOffer(productId),
+    });
+  }
+  updatePartsBalances();
+}
+
+async function buyCatalogItem(item: CatalogItem, payment: { kind: "parts"; amount: number } | { kind: "yan"; productId: string }): Promise<void> {
+  if (payment.kind === "parts") {
+    if (!purchaseItem(playerProfile, item.id, payment.amount)) showToast(t("workshop.insufficient"));
+    else equipCatalogItem(item);
+  } else {
+    const purchase = await localPlatform.purchase(payment.productId);
+    if (!purchase) showToast(t("workshop.unavailable"));
+    else {
+      grantOwnedItem(playerProfile, item.id);
+      equipCatalogItem(item);
+    }
+  }
+  renderWorkshop();
+}
+
+function equipCatalogItem(item: CatalogItem): void {
+  if (item.available === false) return;
+  if (item.category === "model") {
+    playerProfile.selectedModel = item.id;
+    void applySelectedSpinnerModel();
+  }
+  if (item.category === "color") playerProfile.selectedMaterialColors[activeMaterialSlot] = item.id;
+  if (item.category === "trail") playerProfile.selectedTrail = item.id;
+  if (item.category === "aura") playerProfile.selectedAura = item.id;
+  savePlayerProfile(playerProfile);
+  applyPlayerAppearance();
+  if (item.category === "aura") workshopPreview.flashAura(item.id);
+  workshopPreviewSelection[item.category] = item.id;
+  renderWorkshop();
+}
+
+async function buyOffer(productId: string): Promise<void> {
+  const purchase = await localPlatform.purchase(productId);
+  if (!purchase) showToast(t("workshop.unavailable"));
+}
+
+async function previewCatalogItem(item: CatalogItem): Promise<void> {
+  if (item.available === false) return;
+  workshopPreviewSelection[item.category] = item.id;
+  if (item.category === "model") {
+    const requestedAssetKey = isSpinnerModelAssetKey(item.assetKey) ? item.assetKey : "spinner2";
+    try {
+      const loaded = await spinnerModelLoader.load(requestedAssetKey);
+      if (workshopPreviewSelection.model !== item.id) return;
+      workshopPreview.setModelSource(loaded.source, loaded.asset);
+      workshopPreviewAssetKey = loaded.asset.key;
+    } catch (error) {
+      console.error(`Failed to preview spinner model ${requestedAssetKey}`, error);
+      showToast(t("workshop.modelLoadFailed"));
+    }
+  }
+  if (item.category === "color" && item.color) {
+    const previewColors = getSelectedMaterialColorValues();
+    previewColors[activeMaterialSlot] = item.color;
+    workshopPreview.setColors(previewColors);
+  }
+  if (item.category === "trail" && item.color) workshopPreview.setTrailColor(item.color);
+  if (item.category === "aura") workshopPreview.flashAura(item.id);
+}
+
+function restoreWorkshopPreview(): void {
+  const trail = trailCatalog.find((item) => item.id === playerProfile.selectedTrail)?.color ?? "#ffffff";
+  workshopPreview.setColors(getSelectedMaterialColorValues());
+  workshopPreview.setTrailColor(trail);
+  void applySelectedSpinnerModel(false);
+}
+
+function setupWorkshopPreviewInput(): void {
+  const surface = document.querySelector<HTMLElement>("[data-preview-drag]");
+  if (!surface) return;
+  let pointerId: number | null = null;
+  let previousX = 0;
+  surface.addEventListener("pointerdown", (event) => {
+    pointerId = event.pointerId;
+    previousX = event.clientX;
+    surface.setPointerCapture(event.pointerId);
   });
+  surface.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== pointerId) return;
+    workshopPreview.rotateBy(event.clientX - previousX);
+    previousX = event.clientX;
+  });
+  const release = (event: PointerEvent): void => {
+    if (event.pointerId === pointerId) pointerId = null;
+  };
+  surface.addEventListener("pointerup", release);
+  surface.addEventListener("pointercancel", release);
+}
+
+function updatePartsBalances(): void {
+  gameUi.updateCurrency(playerProfile.parts);
+}
+
+function showToast(message: string): void {
+  const toast = document.querySelector<HTMLElement>("[data-toast]");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.hidden = false;
+  window.setTimeout(() => { toast.hidden = true; }, 1800);
+}
+
+function finishMatch(): void {
+  if (!matchStarted) return;
+  matchStarted = false;
+  const rows = getDeathmatchLeaderboardRows(getDeathmatchParticipants());
+  const playerPlace = selectedGameMode === "duel" ? (player.deathmatchStatus === "alive" ? 1 : 2) : (rows.find((row) => row.participant === player)?.rank ?? rows.length);
+  const won = playerPlace === 1;
+  const reward = calculateMatchReward(selectedGameMode, won, player.kills, playerPlace);
+  currentMatchResult = {
+    mode: selectedGameMode,
+    outcome: selectedGameMode === "duel" ? (won ? "victory" : "defeat") : "placed",
+    place: playerPlace,
+    kills: player.kills,
+    partsEarned: reward,
+    bonusClaimed: false,
+  };
+  playerProfile.totalMatches += 1;
+  playerProfile.kills += player.kills;
+  if (won) playerProfile.wins += 1;
+  addParts(playerProfile, reward);
+  savePlayerProfile(playerProfile);
+  closeDeathmatchOverlay();
+  resetCombatVisualState();
+  showResultScreen();
+  if (!playerProfile.purchases.noAds && playerProfile.totalMatches % 3 === 0) void localPlatform.showInterstitialAd();
+}
+
+function showResultScreen(): void {
+  if (!currentMatchResult) return;
+  gameUi.showResult();
+  appScreen = "result";
+  const title = document.querySelector<HTMLElement>("[data-result-title]");
+  if (title) title.textContent = currentMatchResult.outcome === "victory" ? t("result.victory") : currentMatchResult.outcome === "defeat" ? t("result.defeat") : `#${currentMatchResult.place}`;
+  const stats = document.querySelector<HTMLElement>("[data-result-stats]");
+  if (stats) {
+    const rows = getResultStatRows(currentMatchResult, t);
+    stats.replaceChildren(...rows.map((value) => Object.assign(document.createElement("div"), { textContent: value })));
+  }
+  const reward = document.querySelector<HTMLElement>("[data-result-reward]");
+  if (reward) reward.textContent = `+${currentMatchResult.partsEarned}${currentMatchResult.bonusClaimed ? " ×2" : ""}`;
+  const doubleButton = document.querySelector<HTMLButtonElement>("[data-result-double]");
+  if (doubleButton) doubleButton.disabled = currentMatchResult.bonusClaimed;
+  updatePartsBalances();
+}
+
+async function claimDoubleReward(): Promise<void> {
+  if (!currentMatchResult || currentMatchResult.bonusClaimed) return;
+  if (!await localPlatform.showRewardedAd()) return;
+  currentMatchResult.bonusClaimed = true;
+  addParts(playerProfile, currentMatchResult.partsEarned);
+  showResultScreen();
+}
+
+function openMainMenu(): void {
+  matchStarted = false;
+  appScreen = "mainMenu";
+  gameUi.showMainMenu();
+  updatePartsBalances();
 }
 
 function setupMobileControls(): void {
@@ -1499,23 +1831,6 @@ function setupDeathmatchContinueButton(): void {
       closeDeathmatchOverlay();
     }
   });
-}
-
-function applyMenuTranslations(): void {
-  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
-    const key = element.dataset.i18n;
-    if (key) {
-      element.textContent = t(key as Parameters<typeof t>[0]);
-    }
-  }
-  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) {
-    const key = element.dataset.i18nAria;
-    if (key) {
-      const label = t(key as Parameters<typeof t>[0]);
-      element.setAttribute("aria-label", label);
-      element.title = label;
-    }
-  }
 }
 
 function setSelectedElement(element: SpinnerElement): void {
@@ -1564,92 +1879,6 @@ function setupBotDifficultyControls(): void {
   }
 
   applyDifficulty(botDifficulty);
-}
-
-function setupLightControls(): void {
-  const panel = document.querySelector<HTMLElement>("[data-light-settings-panel]");
-  const toggle = document.querySelector<HTMLButtonElement>("[data-light-settings-toggle]");
-  const storedPanelHidden = localStorage.getItem(`${debugSettingStoragePrefix}light.panelHidden`);
-  let panelHidden = storedPanelHidden === "true";
-
-  const syncPanelVisibility = (): void => {
-    if (panel) {
-      panel.hidden = panelHidden;
-    }
-    if (toggle) {
-      toggle.setAttribute("aria-pressed", String(!panelHidden));
-    }
-    localStorage.setItem(`${debugSettingStoragePrefix}light.panelHidden`, String(panelHidden));
-  };
-
-  toggle?.addEventListener("click", () => {
-    panelHidden = !panelHidden;
-    syncPanelVisibility();
-  });
-
-  for (const input of document.querySelectorAll<HTMLInputElement>("[data-light-setting]")) {
-    const setting = input.dataset.lightSetting;
-    if (!isLightSetting(setting)) {
-      continue;
-    }
-
-    const numberInput = document.querySelector<HTMLInputElement>(`[data-light-value="${setting}"]`);
-    restoreStoredInputValue(input, `light.${setting}`);
-    if (numberInput) {
-      numberInput.value = input.value;
-    }
-
-    const syncLightSetting = (): void => {
-      const value = clampTextureInputValue(input, Number(input.value));
-      if (!Number.isFinite(value)) {
-        return;
-      }
-
-      input.value = String(value);
-      if (numberInput) {
-        numberInput.value = String(value);
-      }
-      storeInputValue(`light.${setting}`, input.value);
-      lightSettings[setting] = value;
-      applyLightSettings();
-    };
-
-    input.addEventListener("input", syncLightSetting);
-    numberInput?.addEventListener("input", () => {
-      input.value = numberInput.value;
-      syncLightSetting();
-    });
-    syncLightSetting();
-  }
-
-  const disableLightInput = document.querySelector<HTMLInputElement>("[data-light-disabled]");
-  if (disableLightInput) {
-    const stored = localStorage.getItem(`${debugSettingStoragePrefix}light.disabled`);
-    if (stored !== null) {
-      disableLightInput.checked = stored === "true";
-    }
-    const syncLightDisabled = (): void => {
-      lightSettings.disabled = disableLightInput.checked;
-      localStorage.setItem(`${debugSettingStoragePrefix}light.disabled`, String(disableLightInput.checked));
-      applyLightSettings();
-    };
-    disableLightInput.addEventListener("change", syncLightDisabled);
-    syncLightDisabled();
-  }
-
-  syncPanelVisibility();
-}
-
-function applyLightSettings(): void {
-  const lightMultiplier = lightSettings.disabled ? 0 : 1;
-  ambientLight.intensity = lightSettings.ambient * lightMultiplier;
-  hemisphereLight.intensity = lightSettings.hemisphere * lightMultiplier;
-  keyLight.intensity = lightSettings.key * lightMultiplier;
-  fillLight.intensity = lightSettings.fill * lightMultiplier;
-}
-
-function isLightSetting(value: string | undefined): value is Exclude<keyof typeof lightSettings, "disabled"> {
-  return value === "ambient" || value === "hemisphere" || value === "key" || value === "fill";
 }
 
 function clampTextureInputValue(rangeInput: HTMLInputElement, value: number): number {
@@ -1776,50 +2005,22 @@ function updateDeathmatchLeaderboard(): void {
   if (!deathmatchLeaderboardElement || !deathmatchOverlayOpen) {
     return;
   }
+  renderFullLeaderboard(deathmatchLeaderboardElement, getLeaderboardViewRows(), t);
+}
 
-  const rows = getDeathmatchLeaderboardRows(getDeathmatchParticipants());
-  const title = document.createElement("div");
-  title.className = "deathmatch-leaderboard-title";
-  title.textContent = "Deathmatch";
-
-  const table = document.createElement("table");
-  table.className = "deathmatch-leaderboard-table";
-
-  const header = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  for (const label of ["#", "Name", "K", "D", "Crit", "Rating"]) {
-    const cell = document.createElement("th");
-    cell.textContent = label;
-    headerRow.append(cell);
-  }
-  header.append(headerRow);
-
-  const body = document.createElement("tbody");
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    tr.classList.toggle("player", row.participant === player);
-    tr.classList.toggle("respawning", row.participant.deathmatchStatus === "respawning");
-    tr.classList.toggle("invulnerable", row.participant.deathmatchStatus === "alive" && row.participant.invulnerabilityTimer > 0);
-
-    const cells = [
-      String(row.rank),
-      row.participant.name,
-      String(row.participant.kills),
-      String(row.participant.deaths),
-      String(row.participant === player ? row.participant.playerCriticalHits : 0),
-      String(row.rating),
-    ];
-
-    for (const value of cells) {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      tr.append(cell);
-    }
-    body.append(tr);
-  }
-
-  table.append(header, body);
-  deathmatchLeaderboardElement.replaceChildren(title, table);
+function getLeaderboardViewRows(): LeaderboardViewRow[] {
+  return getDeathmatchLeaderboardRows(getDeathmatchParticipants()).map((row) => ({
+    id: row.participant.participantId,
+    rank: row.rank,
+    name: row.participant.name,
+    kills: row.participant.kills,
+    deaths: row.participant.deaths,
+    criticalHits: row.participant === player ? row.participant.playerCriticalHits : 0,
+    rating: row.rating,
+    player: row.participant === player,
+    respawning: row.participant.deathmatchStatus === "respawning",
+    invulnerable: row.participant.deathmatchStatus === "alive" && row.participant.invulnerabilityTimer > 0,
+  }));
 }
 
 function openDeathmatchOverlay(openedByDeath: boolean): void {
@@ -1918,6 +2119,14 @@ function updateMobileControls(): void {
   const dashActive = player.dash.activeTimeRemaining > 0;
   mobileControls.setDashReady(dashReady, dashActive);
   mobileControls.setUltimateReady(isUltimateReady(player.ultimate), isUltimateActive(player.ultimate));
+  const dashCooldown = player.dash.settings.cooldown > 0
+    ? THREE.MathUtils.clamp(player.dash.cooldownRemaining / player.dash.settings.cooldown, 0, 1)
+    : 0;
+  const ultimateCooldown = 1 - getUltimateChargeRatio(player.ultimate);
+  document.querySelector<HTMLElement>("[data-mobile-dash] .mobile-action-cooldown")
+    ?.style.setProperty("--cooldown", String(dashActive ? 0 : dashCooldown));
+  document.querySelector<HTMLElement>("[data-mobile-ultimate] .mobile-action-cooldown")
+    ?.style.setProperty("--cooldown", String(isUltimateActive(player.ultimate) ? 0 : ultimateCooldown));
 }
 
 function updateFpsCounter(deltaTime: number): void {
@@ -2110,7 +2319,16 @@ function screenPointerToWorld(clientX: number, clientY: number): THREE.Vector3 |
 }
 
 function simulatePhysicsTick(deltaTime: number): void {
+  if (!matchStarted) return;
   elapsedTime += deltaTime;
+
+  if (selectedGameMode === "deathmatch") {
+    matchTimeRemaining = Math.max(0, matchTimeRemaining - deltaTime);
+    if (matchTimeRemaining <= 0) {
+      finishMatch();
+      return;
+    }
+  }
 
   updateDeathmatchRespawns(deltaTime);
   updateRespawnDashes(deltaTime);
@@ -2142,9 +2360,6 @@ function simulatePhysicsTick(deltaTime: number): void {
   for (const damageNumber of collisionResult.damageNumbers) {
     spawnDamageNumber(damageNumber);
   }
-  for (const impact of collisionResult.impacts) {
-    spawnImpactSparks(impact.position, impact.normal, impact.critical);
-  }
   const lightningChainResult = updateLightningChainCombat(deltaTime, collisionResult.damageEvents);
 
   if (selectedElement === "fire" && auraActive) {
@@ -2168,7 +2383,6 @@ function simulatePhysicsTick(deltaTime: number): void {
     ...lightningChainResult.damageEvents,
   ]);
 
-  sparkVfxPool.update(deltaTime);
 }
 
 function updateLightningChainCombat(
@@ -2265,7 +2479,7 @@ function updateDeathmatchRespawns(deltaTime: number): void {
   for (const spinner of getDeathmatchParticipants()) {
     if (spinner.deathmatchStatus === "respawning") {
       spinner.respawnTimer = Math.max(0, spinner.respawnTimer - deltaTime);
-      if (spinner !== player && spinner.respawnTimer <= 0) {
+      if (selectedGameMode === "deathmatch" && spinner.respawnTimer <= 0) {
         startDeathmatchRespawnDash(spinner);
       }
       continue;
@@ -2278,6 +2492,10 @@ function updateDeathmatchRespawns(deltaTime: number): void {
 function updateDeathmatchScores(damageEvents: CombatDamageEvent<SpinnerState>[]): void {
   recordPlayerCriticalHits(damageEvents, player);
   const deaths = applyDeathmatchDeaths(getDeathmatchParticipants(), damageEvents, deathmatchSettings);
+  if (selectedGameMode === "duel" && deaths.length > 0) {
+    finishMatch();
+    return;
+  }
   for (const death of deaths) {
     startDeathmatchRespawn(death.victim);
   }
@@ -2307,6 +2525,9 @@ function startDeathmatchRespawn(spinner: SpinnerState): void {
   spinner.collisionKnockbackMultiplier = 1;
   spinner.elementalMoveSpeedMultiplier = 1;
   spinner.elementalMovementLocked = false;
+  if (spinner === player) {
+    spinner.damageMultiplier = getUpgradeValue("damage", playerProfile.upgrades.damage);
+  }
   spinner.verticalLaunchActive = false;
   spinner.grounded = true;
   spinner.verticalVelocity = 0;
@@ -2429,13 +2650,11 @@ function clearSpinnerTrail(spinner: SpinnerState): void {
   spinner.trailPoints.length = 0;
   spinner.trailVisibleStrength = 0;
   spinner.previousTrailPosition.copy(spinner.group.position);
-  spinner.trailMaterial.opacity = 0;
-  spinner.trailMesh.geometry.setDrawRange(0, 0);
+  spinner.trailVisual.clear();
 }
 
 function hideSpinnerTrailAndTarget(spinner: SpinnerState): void {
-  spinner.trailMaterial.opacity = 0;
-  spinner.trailMesh.geometry.setDrawRange(0, 0);
+  spinner.trailVisual.clear();
   if (spinner.targetLine) {
     spinner.targetLine.line.visible = false;
   }
@@ -2814,7 +3033,7 @@ function startSpinnerFlash(command: CombatFlashCommand<SpinnerState>): void {
   const originalMaterials: FlashMaterialRecord[] = [];
 
   command.spinner.spinGroup.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
+    if (object instanceof THREE.Mesh && !isAnimeSpinnerOutline(object)) {
       originalMaterials.push({ mesh: object, material: object.material });
       object.material = overrideMaterial;
     }
@@ -2916,7 +3135,7 @@ function startDeathmatchProtectedVisual(spinner: SpinnerState): void {
   const originalMaterials: FlashMaterialRecord[] = [];
 
   spinner.spinGroup.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
+    if (object instanceof THREE.Mesh && !isAnimeSpinnerOutline(object)) {
       originalMaterials.push({ mesh: object, material: object.material });
       object.material = material;
     }
@@ -3244,6 +3463,10 @@ function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number)
   }
 
   spinner.group.position.addScaledVector(spinner.velocity, deltaTime);
+  if (!activeArena.contains(spinner.group.position, -spinner.radius * 0.3)) {
+    spinner.group.position.copy(activeArena.clampPoint(spinner.group.position, spinner.radius * 0.3));
+    spinner.velocity.multiplyScalar(-0.2);
+  }
   updateSpinnerVerticalState(spinner, deltaTime);
 
   spinner.distanceMovedThisTick = beforeMove.distanceTo(spinner.group.position);
@@ -3388,55 +3611,12 @@ function trimTrailPoints(spinner: SpinnerState): void {
 
 function updateSolidTrail(spinner: SpinnerState): void {
   const currentPoint = projectToArenaSurface(spinner.group.position, 0.075);
-  const points = [currentPoint, ...spinner.trailPoints].filter((point, index, array) => {
-    return index === 0 || point.distanceTo(array[index - 1]) > 0.025;
-  });
-
-  if (points.length < 3 || spinner.trailVisibleStrength < 0.02) {
-    spinner.trailMaterial.opacity = 0;
-    spinner.trailMesh.geometry.setDrawRange(0, 0);
-    return;
-  }
-
-  const ribbonPoints = smoothTrailPoints(points);
-  const baseWidth = reducedMotionQuery.matches ? 0.18 : 0.34;
-  const tailWidth = reducedMotionQuery.matches ? 0.014 : 0.02;
-  const positions = spinner.trailMesh.userData.positions;
-  const ribbonPointCount = Math.min(ribbonPoints.length, maxTrailRibbonPoints);
-  let positionOffset = 0;
-
-  for (let i = 0; i < ribbonPointCount; i += 1) {
-    const previous = ribbonPoints[Math.max(i - 1, 0)];
-    const next = ribbonPoints[Math.min(i + 1, ribbonPointCount - 1)];
-    const tangent = scratchVector.subVectors(previous, next);
-    tangent.y = 0;
-    if (tangent.lengthSq() < 0.0001) {
-      tangent.set(1, 0, 0);
-    } else {
-      tangent.normalize();
-    }
-
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x);
-    const t = ribbonPointCount === 1 ? 0 : i / (ribbonPointCount - 1);
-    const width = THREE.MathUtils.lerp(baseWidth, tailWidth, t);
-    const point = ribbonPoints[i];
-    const left = point.clone().addScaledVector(normal, width);
-    const right = point.clone().addScaledVector(normal, -width);
-    positions[positionOffset] = left.x;
-    positions[positionOffset + 1] = left.y;
-    positions[positionOffset + 2] = left.z;
-    positions[positionOffset + 3] = right.x;
-    positions[positionOffset + 4] = right.y;
-    positions[positionOffset + 5] = right.z;
-    positionOffset += 6;
-  }
-
-  const geometry = spinner.trailMesh.geometry;
-  const positionAttribute = geometry.getAttribute("position");
-  positionAttribute.needsUpdate = true;
-  geometry.setDrawRange(0, Math.max(ribbonPointCount - 1, 0) * 6);
-  geometry.computeBoundingSphere();
-  spinner.trailMaterial.opacity = spinner.trailVisibleStrength;
+  spinner.trailVisual.update(
+    currentPoint,
+    spinner.trailPoints,
+    spinner.trailVisibleStrength,
+    reducedMotionQuery.matches,
+  );
 }
 
 function updateTargetLine(spinner: SpinnerState): void {
@@ -3474,23 +3654,6 @@ function updateTargetLine(spinner: SpinnerState): void {
   geometry.computeBoundingSphere();
 }
 
-function smoothTrailPoints(points: THREE.Vector3[]): THREE.Vector3[] {
-  if (points.length < 4) {
-    return points;
-  }
-
-  const smoothed: THREE.Vector3[] = [points[0].clone()];
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const current = points[i];
-    const next = points[i + 1];
-    smoothed.push(current.clone().lerp(next, 0.35));
-    smoothed.push(current.clone().lerp(next, 0.7));
-  }
-  smoothed.push(points[points.length - 1].clone());
-
-  return smoothed;
-}
-
 function createArenaBonusPointMarkers(): THREE.Group {
   const group = new THREE.Group();
   group.name = "Arena Bonus Point Markers";
@@ -3511,19 +3674,15 @@ function updateArenaBonusVisuals(deltaTime: number): void {
   arenaBonusVfxPool.update(deltaTime, elapsedTime);
 }
 
-function spawnImpactSparks(origin: THREE.Vector3, normal: THREE.Vector3, critical = false): void {
-  sparkVfxPool.spawnImpact(
-    projectToArenaSurface(origin, 0.06),
-    normal,
-    critical,
-    player.colorAccent,
-    enemySpinners[0]?.colorAccent ?? "#ff3f8e",
-  );
-}
-
 function handleResize(): void {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
+  updateWorkshopStageLayout();
+}
+
+function updateWorkshopStageLayout(): void {
+  const stage = document.querySelector<HTMLElement>("[data-workshop-stage]");
+  if (stage) applyWorkshopStageLayout(stage, window.innerWidth, window.innerHeight);
 }

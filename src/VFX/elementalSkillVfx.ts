@@ -2,43 +2,55 @@ import * as THREE from "three";
 import type { CombatDamageEvent, CombatSpinnerState } from "../simulation/combat";
 import { ExplosionVfxPool } from "./explosionVfx";
 import { FreezeShardVfxPool } from "./freezeVfx";
-import { HitTargetVfxPool } from "./hitTargetVfx";
+import { HitVfxPool } from "./hitVfx";
 import { RockRippleVfxPool } from "./rockRippleVfx";
 
+const normalHitColor = "#fced65";
+const criticalHitColor = "#ff2020";
+const hitRingColor = "#ffffff";
+
 export class ElementalSkillVfx {
-  private readonly normalHit = new HitTargetVfxPool();
-  private readonly criticalHit = new HitTargetVfxPool({
-    poolSize: 8,
-    color: "#ff2020",
-    hotColor: "#ffffff",
-    intensity: 1.15,
-  });
+  private readonly hit = new HitVfxPool({ poolSize: 24 });
   private readonly explosion = new ExplosionVfxPool();
   private readonly rockRipple = new RockRippleVfxPool();
   private readonly freezeShards = new FreezeShardVfxPool();
   private readonly spawnPosition = new THREE.Vector3();
+  private hitReady = false;
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly getSurfaceHeight: (position: THREE.Vector3) => number,
   ) {
     scene.add(
-      this.normalHit.group,
-      this.criticalHit.group,
+      this.hit.group,
       this.explosion.group,
       this.rockRipple.group,
       this.freezeShards.group,
     );
+    void this.hit.ready
+      .then(() => {
+        this.hitReady = true;
+      })
+      .catch((error) => {
+        console.warn("HitVfxPool failed to load textures", error);
+      });
   }
 
   spawnHit(event: CombatDamageEvent<CombatSpinnerState>, reducedMotion = false): void {
-    const pool = event.critical ? this.criticalHit : this.normalHit;
+    if (!this.hitReady) {
+      return;
+    }
+
     this.spawnPosition.copy(event.target.group.position);
     this.spawnPosition.y = Math.max(
       event.target.group.position.y + event.target.radius,
       this.getSurfaceHeight(this.spawnPosition) + 2.05,
     );
-    pool.spawn(this.spawnPosition, event.direction, reducedMotion);
+    this.hit.spawn(this.spawnPosition, event.direction, {
+      edgeColor: event.critical ? criticalHitColor : normalHitColor,
+      ringColor: hitRingColor,
+      reducedMotion,
+    });
   }
 
   spawnExplosion(position: THREE.Vector3): void {
@@ -60,23 +72,28 @@ export class ElementalSkillVfx {
   }
 
   update(deltaTime: number, elapsedTime: number, camera: THREE.Camera): void {
-    this.normalHit.update(deltaTime);
-    this.criticalHit.update(deltaTime);
+    this.hit.update(deltaTime, camera);
     this.explosion.update(deltaTime, elapsedTime, camera);
     this.rockRipple.update(deltaTime, elapsedTime);
     this.freezeShards.update(deltaTime);
   }
 
+  reset(camera: THREE.Camera): void {
+    const expirationDelta = 100;
+    this.hit.update(expirationDelta, camera);
+    this.explosion.update(expirationDelta, 0, camera);
+    this.rockRipple.update(expirationDelta, 0);
+    this.freezeShards.update(expirationDelta);
+  }
+
   dispose(): void {
     this.scene.remove(
-      this.normalHit.group,
-      this.criticalHit.group,
+      this.hit.group,
       this.explosion.group,
       this.rockRipple.group,
       this.freezeShards.group,
     );
-    this.normalHit.dispose();
-    this.criticalHit.dispose();
+    this.hit.dispose();
     this.explosion.dispose();
     this.rockRipple.dispose();
     this.freezeShards.dispose();

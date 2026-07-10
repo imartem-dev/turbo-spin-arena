@@ -80,6 +80,12 @@ export class DamageNumberPool {
     }
   }
 
+  reset(): void {
+    for (const damageNumber of this.numbers) {
+      this.releaseDamageNumber(damageNumber);
+    }
+  }
+
   dispose(): void {
     for (const damageNumber of this.numbers) {
       this.scene.remove(damageNumber.sprite);
