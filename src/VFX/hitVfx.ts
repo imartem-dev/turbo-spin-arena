@@ -20,6 +20,8 @@ export type HitVfxSpawnOptions = {
   ringColor?: THREE.ColorRepresentation;
   reducedMotion?: boolean;
   seed?: number;
+  scale?: number;
+  sparkCount?: number;
 };
 
 type CommonUniforms = {
@@ -44,6 +46,7 @@ type LayerAttributes = {
   seeds: THREE.InstancedBufferAttribute;
   reducedMotion: THREE.InstancedBufferAttribute;
   colors: THREE.InstancedBufferAttribute;
+  scales: THREE.InstancedBufferAttribute;
 };
 
 type SegmentAttributes = LayerAttributes & {
@@ -83,7 +86,7 @@ const shortTextureUrls = Array.from(
 
 export const defaultHitVfxConfig: HitVfxConfig = {
   poolSize: 16,
-  sparksPerHit: 16,
+  sparksPerHit: 40,
   duration: 0.42,
   maxRadius: 1.08,
   intensity: 1.25,
@@ -236,6 +239,8 @@ export class HitVfxPool {
     const reducedMotion = options.reducedMotion ? 1 : 0;
     const edgeColor = new THREE.Color(options.edgeColor ?? "#ff8a1f");
     const ringColor = new THREE.Color(options.ringColor ?? "#ffffff");
+    const effectScale = Math.max(0.1, options.scale ?? 1);
+    const activeSparkCount = resolveHitSparkCount(options.sparkCount, this.config.sparksPerHit);
 
     let directionX = direction.x;
     let directionZ = direction.z;
@@ -260,6 +265,7 @@ export class HitVfxPool {
       seed + 11,
       reducedMotion,
       edgeColor,
+      effectScale,
     );
     this.writeLayerInstance(
       this.ringMesh,
@@ -272,6 +278,7 @@ export class HitVfxPool {
       seed + 23,
       reducedMotion,
       ringColor,
+      effectScale,
     );
 
     const firstLongIndex = Math.floor(random() * this.config.longTextureUrls.length);
@@ -288,6 +295,7 @@ export class HitVfxPool {
       directionZ,
       -THREE.MathUtils.lerp(12, 25, random()) * degreesToRadians,
       THREE.MathUtils.lerp(0.92, 1.08, random()),
+      effectScale,
       seed + 37,
       reducedMotion,
       edgeColor,
@@ -300,6 +308,7 @@ export class HitVfxPool {
       directionZ,
       THREE.MathUtils.lerp(12, 25, random()) * degreesToRadians,
       THREE.MathUtils.lerp(0.92, 1.08, random()),
+      effectScale,
       seed + 53,
       reducedMotion,
       edgeColor,
@@ -313,6 +322,7 @@ export class HitVfxPool {
       directionZ,
       Math.PI + THREE.MathUtils.lerp(-15, 15, random()) * degreesToRadians,
       THREE.MathUtils.lerp(0.62, 0.78, random()),
+      effectScale,
       seed + 71,
       reducedMotion,
       edgeColor,
@@ -322,7 +332,7 @@ export class HitVfxPool {
     for (let index = 0; index < this.config.sparksPerHit; index += 1) {
       const sparkIndex = sparkOffset + index;
       this.sparkMesh.setMatrixAt(sparkIndex, scratchMatrix);
-      if (reducedMotion > 0.5) {
+      if (reducedMotion > 0.5 || index >= activeSparkCount) {
         this.sparkAttributes.startTimes.setX(sparkIndex, inactiveStartTime);
         continue;
       }
@@ -331,7 +341,7 @@ export class HitVfxPool {
         this.config.maxRadius * 1.32,
         this.config.maxRadius * 1.78,
         random(),
-      );
+      ) * effectScale;
       this.sparkAttributes.startTimes.setX(
         sparkIndex,
         startTime + THREE.MathUtils.lerp(0.025, 0.055, random()),
@@ -343,8 +353,8 @@ export class HitVfxPool {
       );
       this.sparkAttributes.sizes.setXY(
         sparkIndex,
-        THREE.MathUtils.lerp(0.018, 0.036, random()),
-        THREE.MathUtils.lerp(0.22, 0.48, random()),
+        THREE.MathUtils.lerp(0.018, 0.036, random()) * effectScale,
+        THREE.MathUtils.lerp(0.22, 0.48, random()) * effectScale,
       );
       this.sparkAttributes.seeds.setX(sparkIndex, seed + index * 13.7);
       this.sparkAttributes.colors.setXYZ(sparkIndex, ringColor.r, ringColor.g, ringColor.b);
@@ -442,6 +452,7 @@ export class HitVfxPool {
     seed: number,
     reducedMotion: number,
     color: THREE.Color,
+    effectScale: number,
   ): void {
     mesh.setMatrixAt(index, scratchMatrix);
     attributes.startTimes.setX(index, startTime);
@@ -450,6 +461,7 @@ export class HitVfxPool {
     attributes.seeds.setX(index, seed);
     attributes.reducedMotion.setX(index, reducedMotion);
     attributes.colors.setXYZ(index, color.r, color.g, color.b);
+    attributes.scales.setX(index, effectScale);
   }
 
   private writeSegmentInstance(
@@ -460,6 +472,7 @@ export class HitVfxPool {
     directionZ: number,
     angleOffset: number,
     sizeScale: number,
+    effectScale: number,
     seed: number,
     reducedMotion: number,
     color: THREE.Color,
@@ -470,10 +483,16 @@ export class HitVfxPool {
     this.segmentAttributes.directions.setXYZ(index, directionX, 0, directionZ);
     this.segmentAttributes.angleOffsets.setX(index, angleOffset);
     this.segmentAttributes.sizeScales.setX(index, sizeScale);
+    this.segmentAttributes.scales.setX(index, effectScale);
     this.segmentAttributes.seeds.setX(index, seed);
     this.segmentAttributes.reducedMotion.setX(index, reducedMotion);
     this.segmentAttributes.colors.setXYZ(index, color.r, color.g, color.b);
   }
+}
+
+export function resolveHitSparkCount(requested: number | undefined, maximum = 40): number {
+  const count = requested ?? 16;
+  return THREE.MathUtils.clamp(Math.floor(count), 0, Math.max(0, Math.floor(maximum)));
 }
 
 function normalizeConfig(config: Partial<HitVfxConfig>): HitVfxConfig {
@@ -519,6 +538,7 @@ function createLayerGeometry(count: number, pivotAtBase: boolean): {
     seeds: createInstancedAttribute(count, 1, 0),
     reducedMotion: createInstancedAttribute(count, 1, 0),
     colors: createInstancedAttribute(count, 3, 1),
+    scales: createInstancedAttribute(count, 1, 1),
   };
   attachLayerAttributes(geometry, attributes);
   return { geometry, attributes };
@@ -567,6 +587,7 @@ function attachLayerAttributes(geometry: THREE.BufferGeometry, attributes: Layer
   geometry.setAttribute("aSeed", attributes.seeds);
   geometry.setAttribute("aReducedMotion", attributes.reducedMotion);
   geometry.setAttribute("aColor", attributes.colors);
+  geometry.setAttribute("aEffectScale", attributes.scales);
 }
 
 function createInstancedAttribute(
@@ -599,6 +620,7 @@ function markLayerAttributesForUpdate(attributes: LayerAttributes): void {
   attributes.seeds.needsUpdate = true;
   attributes.reducedMotion.needsUpdate = true;
   attributes.colors.needsUpdate = true;
+  attributes.scales.needsUpdate = true;
 }
 
 function markSegmentAttributesForUpdate(attributes: SegmentAttributes): void {
@@ -638,10 +660,11 @@ function createCenterMaterial(common: CommonUniforms, atlas: AtlasUniforms): THR
         if (aReducedMotion > 0.5) {
           scale = smoothstep(0.0, 0.025, age) * mix(0.5, 0.26, smoothstep(0.06, 0.18, age));
         }
-        vec2 screenOffset = position.xy * uMaxRadius * 1.45 * scale;
+        float effectScale = max(aEffectScale, 0.001);
+        vec2 screenOffset = position.xy * uMaxRadius * 1.45 * scale * effectScale;
         setBillboardPosition(screenOffset);
         vUv = uv;
-        vEffectUv = screenOffset / (uMaxRadius * 2.0) + 0.5;
+        vEffectUv = screenOffset / (uMaxRadius * 2.0 * effectScale) + 0.5;
         setLayerVaryings(age);
       }
     `,
@@ -675,6 +698,7 @@ function createRingMaterial(common: CommonUniforms, atlas: AtlasUniforms): THREE
         float continuedGrowth = smoothstep(0.085, 0.28, age);
         float scale = pop * (mix(0.42, 0.78, primaryGrowth) + continuedGrowth * 0.3);
         if (aReducedMotion > 0.5) scale = 0.46;
+        float effectScale = max(aEffectScale, 0.001);
         float randomAngle = fract(sin(aSeed * 12.9898) * 43758.5453) * 6.28318530718;
         float angleSine = sin(randomAngle);
         float angleCosine = cos(randomAngle);
@@ -682,10 +706,10 @@ function createRingMaterial(common: CommonUniforms, atlas: AtlasUniforms): THREE
           position.x * angleCosine - position.y * angleSine,
           position.x * angleSine + position.y * angleCosine
         );
-        vec2 screenOffset = rotatedPosition * uMaxRadius * 2.0 * scale;
+        vec2 screenOffset = rotatedPosition * uMaxRadius * 2.0 * scale * effectScale;
         setBillboardPosition(screenOffset);
         vUv = uv;
-        vEffectUv = screenOffset / (uMaxRadius * 2.0) + 0.5;
+        vEffectUv = screenOffset / (uMaxRadius * 2.0 * effectScale) + 0.5;
         setLayerVaryings(age);
       }
     `,
@@ -731,12 +755,13 @@ function createSegmentMaterial(common: CommonUniforms, atlas: AtlasUniforms): TH
         float reveal = smoothstep(0.095, 0.14, age);
         if (aReducedMotion > 0.5) reveal = smoothstep(0.0, 0.025, age) * 0.5;
         float continuedGrowth = mix(1.0, 1.15, smoothstep(0.14, 0.28, age));
-        float length = uMaxRadius * 0.98 * aSizeScale * reveal * continuedGrowth;
-        float width = uMaxRadius * 0.29 * aSizeScale * mix(0.7, 1.0, reveal) * continuedGrowth;
+        float effectScale = max(aEffectScale, 0.001);
+        float length = uMaxRadius * 0.98 * aSizeScale * reveal * continuedGrowth * effectScale;
+        float width = uMaxRadius * 0.29 * aSizeScale * mix(0.7, 1.0, reveal) * continuedGrowth * effectScale;
         vec2 screenOffset = raySide * position.x * width + rayDirection * position.y * length;
         setBillboardPosition(screenOffset);
         vUv = uv;
-        vEffectUv = screenOffset / (uMaxRadius * 2.0) + 0.5;
+        vEffectUv = screenOffset / (uMaxRadius * 2.0 * effectScale) + 0.5;
         setLayerVaryings(age);
       }
     `,
@@ -826,6 +851,7 @@ const layerVertexDeclarations = `
   attribute float aSeed;
   attribute float aReducedMotion;
   attribute vec3 aColor;
+  attribute float aEffectScale;
   uniform float uTime;
   uniform float uDuration;
   uniform float uMaxRadius;

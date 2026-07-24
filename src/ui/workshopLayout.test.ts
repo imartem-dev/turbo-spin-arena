@@ -19,8 +19,11 @@ describe("workshop 720x360 stage layout", () => {
   });
 
   it("keeps the specified logical rectangles inside the 720x360 stage", () => {
-    expect(workshopLogicalRects.preview).toEqual({ x: 8, y: 56, width: 264, height: 232 });
-    expect(workshopLogicalRects.play).toEqual({ x: 50, y: 296, width: 180, height: 48 });
+    expect(workshopLogicalRects.preview).toEqual({ x: 8, y: 56, width: 304, height: 232 });
+    expect(workshopLogicalRects.play).toEqual({ x: 8, y: 292.57, width: 260, height: 59.43 });
+    expect(workshopLogicalRects.play.x).toBe(8);
+    expect(workshopLogicalRects.panel.x - (workshopLogicalRects.play.x + workshopLogicalRects.play.width)).toBe(8);
+    expect(360 - (workshopLogicalRects.play.y + workshopLogicalRects.play.height)).toBeCloseTo(8, 6);
     expect(workshopLogicalRects.panel).toEqual({ x: 276, y: 101, width: 440, height: 254 });
     expect(workshopLogicalRects.panelInner).toEqual({ x: 284, y: 108, width: 424, height: 240 });
     expect(workshopLogicalRects.categorySlots).toEqual({ x: 284, y: 108, width: 68, height: 240 });

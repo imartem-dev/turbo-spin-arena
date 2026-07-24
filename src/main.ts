@@ -1,10 +1,14 @@
 ﻿import * as THREE from "three";
+import { AudioManager } from "./audio/audioManager";
+import "./ui/uiAtlas.css";
 import "./ui/gameUi.css";
 import "./ui/mainMenu.css";
+import "./ui/timedRewards.css";
 import iconBlueUrl from "./img/iconBlue.webp";
 import iconGreenUrl from "./img/iconGreen.webp";
 import iconRedUrl from "./img/iconRed.webp";
 import iconYellowUrl from "./img/iconYellow.webp";
+import spinnerMatcapUrl from "./img/deathmatch/spinner-matcap.webp";
 import { createMobileControls, type MobileControls } from "./input/mobileControls";
 import bonusPinkAuraPreset from "./VFX/bonusPink_aura-preset.json";
 import bonusRedAuraPreset from "./VFX/bonusRed_aura-preset.json";
@@ -15,11 +19,19 @@ import earthAuraPreset from "./VFX/earth_aura-preset.json";
 import fireAuraPreset from "./VFX/Fire_aura_preset.json";
 import frostAuraPreset from "./VFX/Frost_aura-preset.json";
 import lightningAuraPreset from "./VFX/Lightning_aura-preset.json";
-import { cosmeticAuraPresetById } from "./VFX/cosmeticAuraPresets";
+import {
+  SelectableCosmeticAuraVfx,
+  TornadoCritReadyAuraVfx,
+  type CritReadyAuraVfx,
+} from "./VFX/cosmeticAuraVfx";
 import { BonusVfxPool, type ArenaBonusVfxType } from "./VFX/arenaBonusVfx";
 import { DamageNumberPool } from "./VFX/damageNumberPool";
 import { ElementalSkillVfx } from "./VFX/elementalSkillVfx";
+import { LevelUpVfx } from "./VFX/levelUpVfx";
 import { LightningChainVfx, type LightningChainSettings } from "./VFX/lightningChainVfx";
+import { DeathCameraPunch, SpinnerDeathVfxPool, type SpinnerDeathSnapshot } from "./VFX/spinnerDeathVfx";
+import { DashVfx } from "./VFX/dashVfx";
+import { defeatImpactStyle, FinalImpactOverlay, victoryImpactStyle } from "./VFX/victoryImpactOverlay";
 import { maxSpinnerTrailPoints, SpinnerTrailVisual } from "./VFX/spinnerTrail";
 import {
   activeArena,
@@ -30,11 +42,47 @@ import {
   setActiveArena,
 } from "./arenas/bowlArena";
 import { deathmatchArena } from "./arenas/deathmatchArena";
-import { colorCatalog, cosmeticCatalog, modelCatalog, trailCatalog, type CatalogItem } from "./progression/catalog";
-import { addParts, getUpgradeValue, grantOwnedItem, loadPlayerProfile, purchaseItem, purchaseUpgrade, savePlayerProfile } from "./progression/playerProfile";
+import {
+  colorCatalog,
+  cosmeticCatalog,
+  isAuraStyleId,
+  modelCatalog,
+  trailCatalog,
+  type CatalogItem,
+} from "./progression/catalog";
+import {
+  addParts,
+  getUpgradeValue,
+  grantOwnedItem,
+  loadPlayerProfile,
+  mergePlayerProfiles,
+  parsePlayerProfile,
+  purchaseItem,
+  purchaseUpgrade,
+  savePlayerProfile,
+  setPlayerProfileSaveHandler,
+} from "./progression/playerProfile";
 import { calculateMatchReward, type GameMode, type MatchResult } from "./progression/matchProgression";
-import { localPlatform } from "./platform/localPlatform";
-import { createTranslator, detectLanguage } from "./i18n";
+import {
+  advanceTimedRewardActiveTime,
+  claimTimedRewardAd as claimTimedRewardAdGrant,
+  claimTimedReward,
+  resetTimedRewardsForMoscowDay,
+  type TimedRewardGrant,
+} from "./progression/timedRewards";
+import { GameRuntimeLifecycle } from "./platform/gameRuntimeLifecycle";
+import { AdManager } from "./platform/adManager";
+import {
+  createOpponentNames,
+  resolveOpponentAvatarUrl,
+  resolveOpponentName,
+  resolveOpponentStats,
+  type OpponentName,
+} from "./platform/asyncOpponentNames";
+import { LocalPlatformService } from "./platform/localPlatform";
+import type { PlatformProduct, PlatformPurchase } from "./platform/platformService";
+import { createYandexPlatformService } from "./platform/yandexPlatform";
+import { createTranslator, detectLanguage, supportedLanguages, type LanguageCode, type TranslationKey } from "./i18n";
 import { createDashState, getDashSpeedMultiplier, tryStartDash, updateDashState, type DashState } from "./simulation/dash";
 import {
   applyArenaBonusEffect,
@@ -76,6 +124,7 @@ import {
   recoverRPMFromMovement,
   resetSpeedLimitRatio,
   speedLimitMinRatio,
+  getDuelWinnerCoastVelocityScale,
   updateSpeedLimitRatio,
 } from "./simulation/movement";
 import {
@@ -96,20 +145,32 @@ import {
   type SlopeGravitySettings,
 } from "./simulation/slopeGravity";
 import {
-  applyDeathmatchDeaths,
-  defaultDeathmatchSettings,
-  getDeathmatchLeaderboardRows,
-  isDeathmatchAlive,
-  isDeathmatchDamageable,
-  recordPlayerCriticalHits,
-  type DeathmatchStatus,
+  countAliveDeathmatchParticipants,
+  preserveFinalDeathmatchSurvivor,
+  recordDeathmatchEliminations,
 } from "./simulation/deathmatch";
+import {
+  advanceSpinnerDestructions,
+  collectSpinnerDeaths,
+  isSpinnerAlive,
+  isSpinnerDamageable,
+  spinnerDeathRpmThreshold,
+  type SpinnerDeath,
+  type SpinnerLifeState,
+} from "./simulation/spinnerLife";
 import { TornadoVfx, type TornadoVfxPreset } from "./tornadoVfx";
 import { EnemySpinnerInstancedModel } from "./rendering/enemySpinnerInstancedModel";
+import { BotAppearanceRandomizer } from "./rendering/botAppearance";
 import { AnimeOutlinePass } from "./rendering/animeOutlinePass";
 import { WorkshopPreview } from "./rendering/workshopPreview";
 import { WorkshopTilePreviewRenderer } from "./rendering/workshopTilePreviewRenderer";
-import { createAnimeSpinnerVisual, isAnimeSpinnerOutline, type AnimeSpinnerVisual } from "./rendering/animeSpinnerMaterial";
+import {
+  createAnimeSpinnerVisual,
+  isAnimeSpinnerOutline,
+  setAnimeSpinnerMatcapTexture,
+  type AnimeSpinnerVisual,
+} from "./rendering/animeSpinnerMaterial";
+import { SpinnerGroundShadows } from "./rendering/spinnerGroundShadows";
 import {
   SpinnerModelLoader,
   isSpinnerModelAssetKey,
@@ -118,23 +179,34 @@ import {
 } from "./rendering/spinnerModelLoader";
 import {
   GameUiController,
-  getResultStatRows,
   renderWorkshopStyle,
+  renderWorkshopShop,
   renderWorkshopUpgrades,
   type WorkshopCategory,
   type WorkshopPreviewSelection,
 } from "./ui/gameUi";
 import { applyAppViewport, getAppViewport } from "./ui/appViewport";
+import { applyMainMenuStageLayout } from "./ui/mainMenuLayout";
 import { applyWorkshopStageLayout } from "./ui/workshopLayout";
-import { setupMainMenu } from "./ui/mainMenu";
+import { refreshMainMenuTranslations, setupMainMenu } from "./ui/mainMenu";
+import { TimedRewardsUi } from "./ui/timedRewardsUi";
+import { enableUiClickSound } from "./ui/uiClickSound";
 import {
   createCombatHud,
-  renderCompactLeaderboard,
-  renderFullLeaderboard,
+  formatAliveCounter,
   type AbilityHudElements,
-  type LeaderboardViewRow,
   type RpmHudElements,
 } from "./ui/combatHud";
+
+const platform = import.meta.env.BASE_URL === "./"
+  ? await createYandexPlatformService()
+  : new LocalPlatformService();
+const adManager = new AdManager(platform);
+const languageStorageKey = "turbo-spin-arena:language";
+const storedLanguage = localStorage.getItem(languageStorageKey);
+let language: LanguageCode = detectLanguage(storedLanguage ?? platform.language);
+let t = createTranslator(language);
+let enemyOpponentNames: OpponentName[] = createOpponentNames([], 9);
 
 type SpinnerColors = {
   body: string;
@@ -145,7 +217,9 @@ type SpinnerColors = {
 };
 
 type SpinnerOptions = {
+  participantId: string;
   name: string;
+  avatarUrl?: string;
   colors: SpinnerColors;
   position: THREE.Vector3;
   radius: number;
@@ -154,14 +228,6 @@ type SpinnerOptions = {
 };
 
 type KnockbackState = {
-  active: boolean;
-  fromPosition: THREE.Vector3;
-  toPosition: THREE.Vector3;
-  elapsed: number;
-  duration: number;
-};
-
-type RespawnDashState = {
   active: boolean;
   fromPosition: THREE.Vector3;
   toPosition: THREE.Vector3;
@@ -184,7 +250,7 @@ type FlashState = {
 
 type DeathmatchVisualState = {
   active: boolean;
-  material: THREE.MeshBasicMaterial | null;
+  material: THREE.MeshBasicMaterial;
   originalMaterials: FlashMaterialRecord[];
 };
 
@@ -202,13 +268,15 @@ type BotDifficulty = "easy" | "normal" | "hard";
 type SpinnerState = {
   participantId: string;
   name: string;
+  avatarUrl?: string;
   group: THREE.Group;
   spinGroup: THREE.Group;
-  critReadyVfx: TornadoVfx;
+  critReadyVfx: CritReadyAuraVfx;
   ultimateVfx: TornadoVfx;
   bonusAuraVfxByType: Record<TimedArenaBonusType, TornadoVfx>;
   bonusAuraIntroByType: Record<TimedArenaBonusType, number>;
   trailVisual: SpinnerTrailVisual;
+  dashVfx: DashVfx;
   trailPoints: THREE.Vector3[];
   trailSampleTimer: number;
   trailVisibleStrength: number;
@@ -223,7 +291,6 @@ type SpinnerState = {
   dash: DashState;
   ultimate: UltimateChargeState;
   knockback: KnockbackState;
-  respawnDash: RespawnDashState;
   flash: FlashState;
   deathmatchVisual: DeathmatchVisualState;
   forwardDirection: THREE.Vector3;
@@ -251,14 +318,14 @@ type SpinnerState = {
   elementalMoveSpeedMultiplier: number;
   elementalMovementLocked: boolean;
   verticalLaunchActive: boolean;
-  deathmatchStatus: DeathmatchStatus;
-  respawnTimer: number;
-  invulnerabilityTimer: number;
+  lifeState: SpinnerLifeState;
+  destructionTimer: number;
   kills: number;
-  deaths: number;
-  playerCriticalHits: number;
   modelColor: string;
   modelTint: string | null;
+  modelColors: [string, string, string];
+  modelAssetKey: SpinnerModelAssetKey;
+  renderVisible: boolean;
   colorAccent: string;
   lastPosition: THREE.Vector3;
   previousTrailPosition: THREE.Vector3;
@@ -296,6 +363,16 @@ const raycaster = new THREE.Raycaster();
 const pointerFallbackPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeArena.getHeightAt(activeArena.radius, 0));
 const pointerFallbackPoint = new THREE.Vector3();
 const scratchVector = new THREE.Vector3();
+const botCursorDesiredPosition = new THREE.Vector3();
+const botCursorCurrentOffset = new THREE.Vector3();
+const botCursorDesiredOffset = new THREE.Vector3();
+const botCursorCurrentDirection = new THREE.Vector3();
+const botCursorDesiredDirection = new THREE.Vector3();
+const botCursorNextDirection = new THREE.Vector3();
+const botCursorProjected = new THREE.Vector3();
+const botCursorFromBot = new THREE.Vector3();
+const spinnerMoveStart = new THREE.Vector3();
+const spinnerDashDirection = new THREE.Vector3();
 const mobileCameraForward = new THREE.Vector3();
 const mobileCameraRight = new THREE.Vector3();
 const mobileMoveDirection = new THREE.Vector3();
@@ -307,11 +384,12 @@ const healAuraBursts: HealAuraBurst[] = [];
 const idleHealAuraVfx: TornadoVfx[] = [];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 let damageNumberFontReady = false;
+let playerDashVfxFollowRemaining = 0;
+const playerDashVfxLingerDuration = 0.3;
 
 const fixedPhysicsDelta = 1 / 60;
 const maxPhysicsStepsPerFrame = 5;
 const hudUpdateIntervalMs = 100;
-const leaderboardUpdateIntervalMs = 1000;
 const absoluteMaxRPM = 6000;
 const playerBaseMoveSpeed = 17;
 const enemyBaseMoveSpeed = 14;
@@ -359,12 +437,12 @@ const arenaBonusAuraPresetByType: Record<TimedArenaBonusType, TornadoVfxPreset> 
   critDamage: bonusPinkAuraPreset as TornadoVfxPreset,
   damage: bonusRedAuraPreset as TornadoVfxPreset,
 };
-const arenaBonusHudLabelByType: Record<ArenaBonusType, string> = {
-  speed: "Speed bonus",
-  critSpeed: "Critical speed bonus",
-  critDamage: "Critical damage bonus",
-  damage: "Damage bonus",
-  heal: "Heal bonus",
+const arenaBonusHudLabelKeyByType: Record<ArenaBonusType, TranslationKey> = {
+  speed: "bonus.speed",
+  critSpeed: "bonus.critSpeed",
+  critDamage: "bonus.critDamage",
+  damage: "bonus.damage",
+  heal: "bonus.heal",
 };
 const healingZoneSettings = {
   radius: 2.4,
@@ -373,13 +451,7 @@ const healingZoneSettings = {
   postTriggerLife: 0.6,
   maxRpmHealAmount: 1200,
 };
-const deathmatchSettings = defaultDeathmatchSettings;
-const playerContinueDelay = 3;
-const botRespawnDelay = 5;
-const deathmatchBlinkOpacity = 0.8;
-const deathmatchPulseMinOpacity = 0.35;
-const deathmatchPulseFrequency = 2.4;
-const respawnDashDuration = 0.45;
+const deathmatchEliminatedOpacity = 1;
 const deathCameraReturnSpeed = 3.5;
 const bonusAuraIntroDuration = 2;
 const elementIconByElement: Record<SpinnerElement, string> = {
@@ -388,7 +460,21 @@ const elementIconByElement: Record<SpinnerElement, string> = {
   earth: iconGreenUrl,
   lightning: iconYellowUrl,
 };
-const playerProfile = loadPlayerProfile();
+const localPlayerProfile = loadPlayerProfile();
+const cloudPlayerData = await platform.loadPlayerData();
+const cloudPlayerProfile = parsePlayerProfile(cloudPlayerData?.profile);
+const playerProfile = cloudPlayerProfile
+  ? mergePlayerProfiles(localPlayerProfile, cloudPlayerProfile)
+  : localPlayerProfile;
+const platformProducts = new Map<string, PlatformProduct>();
+let profileSaveChain = Promise.resolve();
+setPlayerProfileSaveHandler((profile) => {
+  profileSaveChain = profileSaveChain
+    .then(() => platform.savePlayerData({ profile }, true))
+    .then(() => {});
+  return profileSaveChain;
+});
+savePlayerProfile(playerProfile);
 let selectedElement: SpinnerElement = playerProfile.selectedElement;
 const botCursorMinRadius = 6;
 const botAiSettings: BotAiSettings = {
@@ -422,13 +508,13 @@ const debugSettingStoragePrefix = "turbo-spin-arena.debug.";
 for (const key of ["light.panelHidden", "light.disabled", "light.ambient", "light.hemisphere", "light.key", "light.fill"]) {
   localStorage.removeItem(`${debugSettingStoragePrefix}${key}`);
 }
-let spinnerSizeScale = getStoredDebugNumber("spinnerSize", 0.6, 3, 1);
+const spinnerSizeScale = 2.5;
 
 const maxTrailPoints = maxSpinnerTrailPoints;
 const damageNumberFontUrl = `${import.meta.env.BASE_URL}assets/fonts/ZeroCool.woff2`;
 const damageNumberFontFamily = "ZeroCoolDamage";
+const minSpinnerVisualRpmScale = 0.18;
 const maxRendererPixelRatio = 1.25;
-const screenOutlineQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
 const auraGroundPlaneOffset = 0.06;
 const cameraLookAtTarget = new THREE.Vector3(0, 0, 0);
 const airborneGravity = -18;
@@ -453,6 +539,7 @@ let physicsAccumulator = 0;
 let pointerHasWorldTarget = false;
 const spinnerModelLoader = new SpinnerModelLoader();
 let defaultSpinnerModel: LoadedSpinnerModel | null = null;
+let enemyModelsReady: Promise<void> | null = null;
 let playerSpinnerVisual: AnimeSpinnerVisual | null = null;
 let playerSpinnerAssetKey: SpinnerModelAssetKey | null = null;
 let workshopPreviewAssetKey: SpinnerModelAssetKey | null = null;
@@ -460,20 +547,20 @@ let spinnerModelRequestId = 0;
 let matchStartPending = false;
 let mobileMoveActive = false;
 let matchStarted = false;
+let duelConclusionWinner: SpinnerState | null = null;
 type AppScreen = "mainMenu" | "workshop" | "match" | "result";
 let appScreen: AppScreen = "mainMenu";
 let workshopElapsedTime = 0;
 let selectedGameMode: GameMode = "duel";
-let matchTimeRemaining = 0;
 let currentMatchResult: MatchResult | null = null;
-let workshopReturnScreen: "menu" | "result" = "menu";
-let workshopTab: "style" | "tuning" = "style";
+let workshopTab: "style" | "tuning" | "shop" = "style";
 let workshopPreviewSelection: WorkshopPreviewSelection = {};
 let activeMaterialSlot: 0 | 1 | 2 = 0;
 let activeWorkshopCategory: WorkshopCategory = "model";
 let gameLoopStarted = false;
-let deathmatchOverlayOpen = false;
-let deathmatchOverlayOpenedByDeath = false;
+let deathmatchConclusionPending = false;
+let victoryPresentationPending = false;
+let deathmatchDefeatedBeforePlayer = 0;
 let deathCameraActive = false;
 let deathCameraReturning = false;
 const defaultCameraPosition = new THREE.Vector3(cameraSettings.gameX, cameraSettings.gameY, cameraSettings.gameZ);
@@ -483,20 +570,40 @@ const savedCameraLookAt = defaultCameraLookAt.clone();
 let fpsFrameCount = 0;
 let fpsElapsedTime = 0;
 let hudUpdateIntervalId: number | null = null;
-let leaderboardUpdateIntervalId: number | null = null;
+let rewardedAdPending = false;
+let mobileControls: MobileControls | null = null;
+let audioManager!: AudioManager;
 
-const language = detectLanguage(navigator.language);
-const t = createTranslator(language);
 const gameUi = new GameUiController({
-  onStartMatch: () => void startMatch(selectedGameMode),
-  onOpenWorkshop: openWorkshop,
-  onCloseWorkshop: closeWorkshop,
-  onReplay: () => void startMatch(selectedGameMode),
-  onOpenMainMenu: openMainMenu,
+  onStartMatch: () => void runNonGameplayTransition(() => startMatch(selectedGameMode)),
+  onOpenWorkshop: (origin) => void runNonGameplayTransition(() => openWorkshop(origin)),
+  onCloseWorkshop: () => void runNonGameplayTransition(closeWorkshop),
+  onReplay: () => void runNonGameplayTransition(() => startMatch(selectedGameMode)),
+  onOpenMainMenu: () => void runNonGameplayTransition(openMainMenu),
   onClaimDoubleReward: () => void claimDoubleReward(),
 });
+const timedRewardsUi = new TimedRewardsUi({
+  t,
+  onClaim: claimCurrentTimedReward,
+  onClaimAd: claimTimedRewardAd,
+});
+let timedRewardLastServerTime = platform.serverTime();
+let timedRewardUnsavedMs = 0;
 document.documentElement.lang = language;
 document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+document.title = t("game.title");
+const runtimeLifecycle = new GameRuntimeLifecycle({
+  onPauseChanged: (paused) => {
+    audioManager?.setPaused(paused);
+    syncGameplayState();
+  },
+  onResume: resetFrameTime,
+});
+runtimeLifecycle.attach();
+platform.setAdHooks({
+  beforeAd: flushPlayerProfileSave,
+  setAdPaused: (paused) => runtimeLifecycle.setPaused("ad", paused),
+});
 let appViewport = getAppViewport(window);
 const initialViewport = syncAppViewport();
 
@@ -507,6 +614,10 @@ const camera = new THREE.PerspectiveCamera(50, initialViewport.width / initialVi
 camera.position.copy(defaultCameraPosition);
 camera.lookAt(cameraLookAtTarget);
 scene.add(camera);
+audioManager = new AudioManager(camera);
+audioManager.preload();
+enableUiClickSound(audioManager);
+document.addEventListener("pointerdown", () => audioManager.resume(), { once: true, capture: true });
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
@@ -514,14 +625,19 @@ renderer.setSize(initialViewport.width, initialViewport.height);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = false;
 document.body.appendChild(renderer.domElement);
-const combatAnimeOutlinePass = new AnimeOutlinePass({
-  outerWidth: 2.5,
-  innerWidth: 0.75,
-  normalThreshold: 0.58,
-  depthThreshold: 0.014,
-  innerOpacity: 0,
-  outerOpacity: 1,
+const cosmeticAuraDepthResolution = new THREE.Vector2();
+const cosmeticAuraDepthTarget = new THREE.WebGLRenderTarget(1, 1, {
+  depthBuffer: true,
+  stencilBuffer: false,
 });
+cosmeticAuraDepthTarget.depthTexture = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
+const spinnerMatcapTexture = new THREE.TextureLoader().load(spinnerMatcapUrl);
+spinnerMatcapTexture.colorSpace = THREE.SRGBColorSpace;
+spinnerMatcapTexture.wrapS = THREE.ClampToEdgeWrapping;
+spinnerMatcapTexture.wrapT = THREE.ClampToEdgeWrapping;
+spinnerMatcapTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+setAnimeSpinnerMatcapTexture(spinnerMatcapTexture);
+const combatAnimeOutlinePass = new AnimeOutlinePass();
 const combatAnimeOutlineViewport = new THREE.Vector4();
 const combatAnimeOutlineTargets: THREE.Object3D[] = [];
 const workshopPreview = new WorkshopPreview();
@@ -535,6 +651,13 @@ let arenaBonusState = createArenaBonusState(activeArena.interestPoints);
 const arenaBonusVfxPool = new BonusVfxPool(scene, arenaBonusColorByType, reducedMotionQuery);
 arenaBonusVfxPool.prewarm({ particles: 160, pulses: 36 });
 const enemySpinnerInstancedModel = new EnemySpinnerInstancedModel(scene, 9);
+const spinnerGroundShadows = new SpinnerGroundShadows(scene, 10);
+const botAppearanceRandomizer = new BotAppearanceRandomizer(modelCatalog, colorCatalog);
+const spinnerDeathVfx = new SpinnerDeathVfxPool(scene, (x, z) => activeArena.getHeightAt(x, z), 32);
+const victoryLevelUpVfx = new LevelUpVfx();
+scene.add(victoryLevelUpVfx.group);
+const finalImpactOverlay = new FinalImpactOverlay(camera);
+const deathCameraPunch = new DeathCameraPunch();
 const damageNumberPool = new DamageNumberPool(scene, damageNumberFontFamily, () => damageNumberFontReady);
 prewarmHealingZones();
 prewarmHealAuraBursts();
@@ -543,7 +666,8 @@ arenaMarkerGroups.set("duel", arenaBonusPointMarkers);
 scene.add(arenaBonusPointMarkers);
 
 const player = createSpinner({
-  name: "Player",
+  participantId: "player",
+  name: t("hud.player"),
   colors: {
     body: "#3f72e5",
     cone: "#d9f6ff",
@@ -558,13 +682,16 @@ const player = createSpinner({
 });
 
 const enemySpinners: SpinnerState[] = [];
+const selectedEnemySpinGroups: THREE.Object3D[] = [];
+const enemySpinSelectionInterval = 0.5;
+let enemySpinSelectionElapsed = 0;
 const combatSpinners: SpinnerState[] = [player];
 const elementalSkillState = createElementalSkillState<SpinnerState>();
 const elementalSkillVfx = new ElementalSkillVfx(scene, getActiveArenaHeight);
 const lightningChainVfx = new LightningChainVfx<SpinnerState>(
   scene,
   lightningChainSettings,
-  (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+  isSpinnerDamageable,
   getActiveArenaHeight,
 );
 const botAiDirector = createBotAiDirector();
@@ -572,51 +699,73 @@ const latestEnemyAiCommands = new Map<SpinnerState, BotAiCommand>();
 let hudElements: RpmHudElements[] = [];
 let dashHudElements: DashHudElements | null = null;
 let ultimateHudElements: UltimateHudElements | null = null;
-let mobileControls: MobileControls | null = null;
-const deathmatchLeaderboardElement = document.querySelector<HTMLElement>("[data-deathmatch-leaderboard]");
-const compactLeaderboardElement = document.querySelector<HTMLElement>("[data-compact-leaderboard]");
-const deathmatchOverlayElement = document.querySelector<HTMLElement>("[data-deathmatch-overlay]");
-const deathmatchScoreboardButton = document.querySelector<HTMLButtonElement>("[data-deathmatch-scoreboard]");
-const deathmatchContinueButton = document.querySelector<HTMLButtonElement>("[data-deathmatch-continue]");
+const deathmatchAliveCounterElement = document.querySelector<HTMLElement>("[data-deathmatch-alive]");
 const fpsCounterElement = document.querySelector<HTMLElement>("[data-fps-counter]");
-let botDifficulty: BotDifficulty = "normal";
+const deathmatchEliminationSlots = Array.from({ length: 10 }, () => new THREE.Vector3());
+const botDifficulty: BotDifficulty = "hard";
 let botAiDecisionCountdown = 0;
 let botAiDecisionElapsedTime = 0;
 
 scene.add(player.group);
 scene.add(player.trailVisual.group);
+scene.add(player.dashVfx.group);
+resizeCosmeticAuraDepthTarget();
 player.targetLine = createTargetLine("#ffffff", 0.95, 4);
 scene.add(player.targetLine.line);
-loadDamageNumberFont();
-void loadCustomSpinnerModel();
+const damageNumberFontLoad = loadDamageNumberFont();
+const initialModelLoad = loadCustomSpinnerModel();
 player.targetPosition.copy(player.group.position);
 setEnemyCount(1);
 hudElements = createRpmHud(player, enemySpinners);
 setupSettingTooltips();
-setupSpinnerSizeControl();
-setupBotDifficultyControls();
 setupMainMenu({
   initialMode: selectedGameMode,
   devMode: import.meta.env.DEV,
   t,
+  language,
+  languages: supportedLanguages,
   onModeSelected: (mode) => {
     selectedGameMode = mode;
   },
-  onClaimFreeChest: () => {
-    const reward = 100;
-    addParts(playerProfile, reward);
-    gameUi.updateCurrency(playerProfile.parts);
-    return reward;
-  },
+  onLanguageSelected: selectLanguage,
+  onSoundChanged: (enabled) => audioManager?.setMuted(!enabled),
 });
+startTimedRewards();
 fpsCounterElement?.toggleAttribute("hidden", !import.meta.env.DEV);
-setupDeathmatchContinueButton();
 setupMobileControls();
 setupGameScreens();
-updateWorkshopStageLayout();
+setupPlatformAuthorization();
+void initializePlatformCommerce();
+  updateWorkshopStageLayout();
+  updateMainMenuStageLayout();
+  updateTimedRewardsLayout();
 applyPlayerProgression();
 applyPlayerAppearance();
 startGameLoop();
+void markPlatformPlayable(initialModelLoad, damageNumberFontLoad);
+
+function selectLanguage(nextLanguage: LanguageCode): void {
+  if (nextLanguage === language) return;
+  language = nextLanguage;
+  t = createTranslator(language);
+  localStorage.setItem(languageStorageKey, language);
+  document.documentElement.lang = language;
+  document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  document.title = t("game.title");
+  refreshMainMenuTranslations(t);
+  timedRewardsUi.setTranslator(t);
+  updateTimedRewards();
+  player.name = t("hud.player");
+  for (const [index, enemy] of enemySpinners.entries()) {
+    enemy.name = resolveOpponentName(enemyOpponentNames[index], t);
+    enemy.avatarUrl = resolveOpponentAvatarUrl(enemyOpponentNames[index]);
+  }
+  hudElements = createRpmHud(player, enemySpinners);
+  updateHudSystems();
+  if (appScreen === "workshop") renderWorkshop();
+  if (appScreen === "result") showResultScreen();
+  document.dispatchEvent(new CustomEvent<LanguageCode>("turbo-spin-arena:language-changed", { detail: language }));
+}
 
 renderer.domElement.addEventListener("pointermove", handlePointer);
 renderer.domElement.addEventListener("pointerdown", handlePointerDown);
@@ -638,13 +787,92 @@ function startUiUpdateTimers(): void {
   if (hudUpdateIntervalId === null) {
     hudUpdateIntervalId = window.setInterval(updateHudSystems, hudUpdateIntervalMs);
   }
-  if (leaderboardUpdateIntervalId === null) {
-    leaderboardUpdateIntervalId = window.setInterval(updateOpenDeathmatchLeaderboard, leaderboardUpdateIntervalMs);
+}
+
+function startTimedRewards(): void {
+  updateTimedRewards();
+  window.setInterval(updateTimedRewards, 1_000);
+  document.addEventListener("visibilitychange", () => {
+    timedRewardLastServerTime = platform.serverTime();
+    updateTimedRewards();
+  });
+}
+
+function updateTimedRewards(): void {
+  const serverNow = platform.serverTime();
+  if (resetTimedRewardsForMoscowDay(playerProfile.timedRewards, serverNow)) {
+    timedRewardUnsavedMs = 0;
+    savePlayerProfile(playerProfile);
   }
+  const elapsedMs = Math.min(1_500, Math.max(0, serverNow - timedRewardLastServerTime));
+  timedRewardLastServerTime = serverNow;
+  if (!runtimeLifecycle.paused && !document.hidden && elapsedMs > 0) {
+    advanceTimedRewardActiveTime(playerProfile.timedRewards, elapsedMs);
+    timedRewardUnsavedMs += elapsedMs;
+    if (timedRewardUnsavedMs >= 30_000) {
+      timedRewardUnsavedMs = 0;
+      savePlayerProfile(playerProfile);
+    }
+  }
+  timedRewardsUi.render(playerProfile.timedRewards, serverNow);
+}
+
+async function claimCurrentTimedReward(index: number): Promise<TimedRewardGrant | null> {
+  const grant = claimTimedReward(playerProfile.timedRewards, playerProfile, index, platform.serverTime());
+  if (!grant) return null;
+  timedRewardUnsavedMs = 0;
+  gameUi.updateCurrency(playerProfile.parts);
+  timedRewardsUi.render(playerProfile.timedRewards, platform.serverTime());
+  await flushPlayerProfileSave();
+  requestAnimationFrame(() => workshopTilePreviewRenderer.invalidate());
+  return grant;
+}
+
+async function claimTimedRewardAd(): Promise<TimedRewardGrant | null> {
+  let grant: TimedRewardGrant | null = null;
+  await adManager.showRewardedAd(async () => {
+    grant = claimTimedRewardAdGrant(playerProfile.timedRewards, playerProfile, platform.serverTime());
+    if (!grant) return;
+    gameUi.updateCurrency(playerProfile.parts);
+    timedRewardsUi.render(playerProfile.timedRewards, platform.serverTime());
+    await flushPlayerProfileSave();
+  });
+  return grant;
+}
+
+async function runNonGameplayTransition(action: () => void | Promise<void>): Promise<void> {
+  gameUi.setBusy(true);
+  try {
+    await adManager.runTransition(action, !playerProfile.purchases.noAds);
+  } finally {
+    gameUi.setBusy(false);
+  }
+}
+
+function syncGameplayState(): void {
+  if (runtimeLifecycle.paused) mobileControls?.reset();
+  platform.setGameplayActive(appScreen === "match" && matchStarted && !runtimeLifecycle.paused);
+}
+
+function resetFrameTime(): void {
+  clock.stop();
+  clock.start();
+  physicsAccumulator = 0;
+  mobileControls?.reset();
+}
+
+async function flushPlayerProfileSave(): Promise<void> {
+  savePlayerProfile(playerProfile);
+  await profileSaveChain;
 }
 
 function runGameFrame(): void {
   const frameDeltaTime = Math.min(clock.getDelta(), 0.1);
+  deathCameraPunch.remove(camera);
+  if (runtimeLifecycle.paused) {
+    renderer.render(scene, camera);
+    return;
+  }
   updateFpsCounter(frameDeltaTime);
 
   if (appScreen === "workshop") {
@@ -662,7 +890,7 @@ function runGameFrame(): void {
     return;
   }
 
-  workshopTilePreviewRenderer.updateAndRender(0, 0, false);
+  workshopTilePreviewRenderer.updateAndRender(0, 0, timedRewardsUi.isOpen);
 
   if (appScreen === "match" && matchStarted) {
     physicsAccumulator += frameDeltaTime;
@@ -677,32 +905,54 @@ function runGameFrame(): void {
     if (physicsSteps === maxPhysicsStepsPerFrame) {
       physicsAccumulator = 0;
     }
-    updateCritReadyVfx(frameDeltaTime);
-    updateUltimateVfx(frameDeltaTime);
-    updateLightningChainVfx(frameDeltaTime);
-    elementalSkillVfx.update(frameDeltaTime, elapsedTime, camera);
-    updateBonusAuraVfx(frameDeltaTime);
-    updateDeathmatchProtectedVisuals(frameDeltaTime);
-    updateHealAuraBursts(frameDeltaTime);
-    updateArenaBonusVisuals(frameDeltaTime);
-    if (isDeathmatchAlive(player)) {
-      updateSolidTrail(player);
-      updateTargetLine(player);
-    } else {
-      hideSpinnerTrailAndTarget(player);
+    if (matchStarted) {
+      updateCritReadyVfx(frameDeltaTime);
+      updateUltimateVfx(frameDeltaTime);
+      updateLightningChainVfx(frameDeltaTime);
+      updateBonusAuraVfx(frameDeltaTime);
+      updatePlayerDashVfx(frameDeltaTime);
+      updateHealAuraBursts(frameDeltaTime);
+      updateArenaBonusVisuals(frameDeltaTime);
+      if (isSpinnerAlive(player)) {
+        updateSolidTrail(player);
+        updateTargetLine(player);
+      } else {
+        hideSpinnerTrailAndTarget(player);
+      }
+      for (const spinner of enemySpinners) {
+        if (isSpinnerAlive(spinner)) updateSolidTrail(spinner);
+        else hideSpinnerTrailAndTarget(spinner);
+      }
+      updateDeathCamera(frameDeltaTime);
     }
-    for (const spinner of enemySpinners) {
-      if (isDeathmatchAlive(spinner)) updateSolidTrail(spinner);
-      else hideSpinnerTrailAndTarget(spinner);
-    }
-    damageNumberPool.update(frameDeltaTime);
-    updateDeathCamera(frameDeltaTime);
-    for (const spinner of enemySpinners) enemySpinnerInstancedModel.setFrozen(spinner, spinner.elementalMovementLocked);
-    enemySpinnerInstancedModel.sync(enemySpinners, frameDeltaTime);
   }
 
+  if (appScreen === "match") {
+    if (!matchStarted) updateDuelConclusionPresentation(frameDeltaTime);
+    elementalSkillVfx.update(frameDeltaTime, elapsedTime, camera);
+    victoryLevelUpVfx.update(frameDeltaTime, camera);
+    finalImpactOverlay.update(frameDeltaTime);
+    damageNumberPool.update(frameDeltaTime);
+    advanceSpinnerDestructions(combatSpinners, frameDeltaTime, handleSpinnerDestructionComplete);
+    spinnerDeathVfx.update(frameDeltaTime);
+    updateDeathmatchEliminatedVisuals();
+    for (const spinner of enemySpinners) enemySpinnerInstancedModel.setFrozen(spinner, spinner.elementalMovementLocked);
+    enemySpinnerInstancedModel.sync(enemySpinners, frameDeltaTime);
+    activeArena.updateVisuals?.(frameDeltaTime, elapsedTime, reducedMotionQuery.matches);
+    spinnerGroundShadows.sync(
+      combatSpinners,
+      activeArena.getHeightAt,
+      selectedGameMode === "deathmatch",
+    );
+    deathCameraPunch.updateAndApply(camera, frameDeltaTime);
+    finishMatchAfterVictoryPresentation();
+  } else {
+    spinnerGroundShadows.sync(combatSpinners, activeArena.getHeightAt, false);
+  }
+
+  renderCosmeticAuraDepthPrepass();
   renderer.render(scene, camera);
-  if (appScreen === "match" && screenOutlineQuery.matches) {
+  if (appScreen === "match") {
     const outlineTargets = collectCombatAnimeOutlineTargets();
     if (import.meta.env.DEV) renderer.domElement.dataset.animeOutlineTargets = String(outlineTargets.length);
     renderer.getViewport(combatAnimeOutlineViewport);
@@ -721,19 +971,21 @@ function collectCombatAnimeOutlineTargets(): THREE.Object3D[] {
     combatAnimeOutlineTargets.push(playerSpinnerVisual.root);
   }
   combatAnimeOutlineTargets.push(...enemySpinnerInstancedModel.getOutlineTargets());
+  combatAnimeOutlineTargets.push(...spinnerDeathVfx.getOutlineTargets());
   return combatAnimeOutlineTargets;
 }
 
 function updateCritReadyVfx(deltaTime: number): void {
   for (const spinner of combatSpinners) {
-    if (!isDeathmatchDamageable(spinner)) {
-      spinner.critReadyVfx.group.visible = false;
+    if (!isSpinnerDamageable(spinner)) {
+      spinner.critReadyVfx.setActive(false);
+      spinner.critReadyVfx.update(deltaTime, elapsedTime, camera, reducedMotionQuery.matches);
       continue;
     }
     const ready = isCritSpeedReady(spinner);
-    spinner.critReadyVfx.group.visible = ready;
+    spinner.critReadyVfx.setActive(ready);
+    spinner.critReadyVfx.update(deltaTime, elapsedTime, camera, reducedMotionQuery.matches);
     if (ready) {
-      spinner.critReadyVfx.update(deltaTime, elapsedTime);
       projectAuraGroundToArena(spinner.critReadyVfx);
     }
   }
@@ -741,7 +993,7 @@ function updateCritReadyVfx(deltaTime: number): void {
 
 function updateUltimateVfx(deltaTime: number): void {
   for (const spinner of combatSpinners) {
-    if (!isDeathmatchAlive(spinner)) {
+    if (!isSpinnerAlive(spinner)) {
       spinner.ultimateVfx.group.visible = false;
       continue;
     }
@@ -760,7 +1012,7 @@ function updateLightningChainVfx(deltaTime: number): void {
 
 function updateBonusAuraVfx(deltaTime: number): void {
   for (const spinner of combatSpinners) {
-    if (!isDeathmatchAlive(spinner)) {
+    if (!isSpinnerAlive(spinner)) {
       for (const type of arenaBonusTypes) {
         spinner.bonusAuraVfxByType[type].group.visible = false;
       }
@@ -803,7 +1055,7 @@ function updateBonusAuraIntro(spinner: SpinnerState, type: TimedArenaBonusType, 
   spinner.bonusAuraVfxByType[type].group.scale.set(widthScale, heightScale, widthScale);
 }
 
-function projectAuraGroundToArena(vfx: TornadoVfx): void {
+function projectAuraGroundToArena(vfx: Pick<CritReadyAuraVfx, "projectGroundToSurface"> | TornadoVfx): void {
   vfx.projectGroundToSurface(sampleActiveArenaHeight, auraGroundPlaneOffset, elapsedTime);
 }
 
@@ -820,27 +1072,6 @@ function updateHudSystems(): void {
   updateDashHud(dashHudElements);
   updateUltimateHud(ultimateHudElements);
   updateMobileControls();
-  updateDeathmatchContinueButton();
-  const timer = document.querySelector<HTMLElement>("[data-match-timer]");
-  if (timer) {
-    timer.hidden = selectedGameMode !== "deathmatch";
-    const seconds = Math.ceil(matchTimeRemaining);
-    timer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  }
-  if (compactLeaderboardElement) {
-    compactLeaderboardElement.hidden = selectedGameMode !== "deathmatch";
-    if (selectedGameMode === "deathmatch") {
-      renderCompactLeaderboard(compactLeaderboardElement, getLeaderboardViewRows(), t);
-    }
-  }
-}
-
-function updateOpenDeathmatchLeaderboard(): void {
-  if (!deathmatchOverlayOpen) {
-    return;
-  }
-
-  updateDeathmatchLeaderboard();
 }
 
 function createSpinner(options: SpinnerOptions): SpinnerState {
@@ -890,8 +1121,11 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   spinGroup.add(topWedges);
 
   const trailVisual = new SpinnerTrailVisual("#ffffff");
-  const critReadyVfx = new TornadoVfx(critSpeedReadyAuraPreset as TornadoVfxPreset);
-  critReadyVfx.group.visible = false;
+  const dashVfx = new DashVfx({ character: group, color: "#ffffff" });
+  const critReadyVfx: CritReadyAuraVfx = options.participantId === "player"
+    ? new SelectableCosmeticAuraVfx()
+    : new TornadoCritReadyAuraVfx();
+  critReadyVfx.setActive(false);
   group.add(critReadyVfx.group);
   const ultimateVfx = new TornadoVfx(ultimateAuraPresetByElement[selectedElement]);
   ultimateVfx.group.visible = false;
@@ -905,8 +1139,9 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
   const initialForward = new THREE.Vector3(1, 0, 0);
 
   return {
-    participantId: options.name,
+    participantId: options.participantId,
     name: options.name,
+    avatarUrl: options.avatarUrl,
     group,
     spinGroup,
     critReadyVfx,
@@ -914,6 +1149,7 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
     bonusAuraVfxByType,
     bonusAuraIntroByType: createBonusAuraIntroByType(),
     trailVisual,
+    dashVfx,
     trailPoints: [options.position.clone()],
     trailSampleTimer: 0,
     trailVisibleStrength: 0,
@@ -934,13 +1170,6 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
       elapsed: 0,
       duration: 0,
     },
-    respawnDash: {
-      active: false,
-      fromPosition: options.position.clone(),
-      toPosition: options.position.clone(),
-      elapsed: 0,
-      duration: 0,
-    },
     flash: {
       sequence: [],
       stepIndex: 0,
@@ -950,7 +1179,12 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
     },
     deathmatchVisual: {
       active: false,
-      material: null,
+      material: new THREE.MeshBasicMaterial({
+        color: "#ffffff",
+        transparent: true,
+        opacity: deathmatchEliminatedOpacity,
+        depthTest: true,
+      }),
       originalMaterials: [],
     },
     forwardDirection: initialForward,
@@ -978,14 +1212,14 @@ function createSpinner(options: SpinnerOptions): SpinnerState {
     elementalMoveSpeedMultiplier: 1,
     elementalMovementLocked: false,
     verticalLaunchActive: false,
-    deathmatchStatus: "alive",
-    respawnTimer: 0,
-    invulnerabilityTimer: 0,
+    lifeState: "alive",
+    destructionTimer: 0,
     kills: 0,
-    deaths: 0,
-    playerCriticalHits: 0,
     modelColor: options.colors.body,
     modelTint: null,
+    modelColors: [options.colors.body, options.colors.cone, options.colors.cap],
+    modelAssetKey: "spinner2",
+    renderVisible: true,
     colorAccent: options.colors.blur,
     lastPosition: options.position.clone(),
     previousTrailPosition: options.position.clone(),
@@ -1013,7 +1247,9 @@ function createBonusAuraIntroByType(): Record<TimedArenaBonusType, number> {
 function createEnemySpinner(index: number): SpinnerState {
   const spawn = activeArena.enemySpawns[index % activeArena.enemySpawns.length];
   const enemySpinner = createSpinner({
-    name: `Enemy ${index + 1}`,
+    participantId: `bot-${index + 1}`,
+    name: resolveOpponentName(enemyOpponentNames[index], t),
+    avatarUrl: resolveOpponentAvatarUrl(enemyOpponentNames[index]),
     colors: {
       body: "#d14a50",
       cone: "#ffeecc",
@@ -1030,7 +1266,7 @@ function createEnemySpinner(index: number): SpinnerState {
   enemySpinner.desiredTargetPosition.copy(enemySpinner.group.position);
   enemySpinner.followTargetPosition.copy(enemySpinner.group.position);
   enemySpinner.visualTargetPosition.copy(enemySpinner.group.position);
-  enemySpinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(enemySpinner, enemySpinner.group.position));
+  enemySpinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(enemySpinner, enemySpinner.group.position, botCursorProjected));
   enemySpinner.botDesiredCursorPosition.copy(enemySpinner.botVirtualCursorPosition);
   enemySpinner.followTargetPosition.copy(enemySpinner.botVirtualCursorPosition);
   return enemySpinner;
@@ -1074,7 +1310,7 @@ function setEnemyCount(count: number): void {
 
 function disposeSpinner(spinner: SpinnerState): void {
   finishSpinnerFlash(spinner);
-  finishDeathmatchProtectedVisual(spinner);
+  finishDeathmatchEliminatedVisual(spinner);
   scene.remove(spinner.group, spinner.trailVisual.group);
   if (spinner.targetLine) {
     scene.remove(spinner.targetLine.line);
@@ -1105,17 +1341,48 @@ function clearPairImpactTimes(): void {
 
 async function loadCustomSpinnerModel(): Promise<void> {
   try {
-    defaultSpinnerModel = await spinnerModelLoader.load("spinner2");
-    enemySpinnerInstancedModel.setModelSource(
-      defaultSpinnerModel.source,
-      defaultSpinnerModel.asset,
-      enemySpinners[0]?.baseRadius ?? player.baseRadius,
-    );
+    await prepareEnemySpinnerModels();
     for (const spinner of enemySpinners) installInstancedEnemySpinnerModel(spinner);
+    const loadedDefault = defaultSpinnerModel;
+    if (!loadedDefault) throw new Error("Default spinner model was not prepared");
+    try {
+      const destructionSource = await spinnerModelLoader.loadDestruction("spinner2");
+      spinnerDeathVfx.setModelSource(
+        destructionSource,
+        loadedDefault.asset.rotationX,
+        player.baseRadius * 1.65,
+      );
+    } catch (error) {
+      console.warn("Failed to load spinner destruction model", error);
+    }
     await applySelectedSpinnerModel(false);
   } catch (error) {
     console.error("Failed to load the default spinner model", error);
   }
+}
+
+function prepareEnemySpinnerModels(): Promise<void> {
+  if (enemyModelsReady) return enemyModelsReady;
+  enemyModelsReady = (async () => {
+    defaultSpinnerModel = await spinnerModelLoader.load("spinner2");
+    const radius = enemySpinners[0]?.baseRadius ?? player.baseRadius;
+    await Promise.all(modelCatalog.map(async (item) => {
+      if (!isSpinnerModelAssetKey(item.assetKey)) return;
+      try {
+        const loaded = await spinnerModelLoader.load(item.assetKey);
+        enemySpinnerInstancedModel.setModelSource(loaded.source, loaded.asset, radius);
+      } catch (error) {
+        console.warn(`Failed to load enemy spinner model ${item.assetKey}; using spinner2`, error);
+        enemySpinnerInstancedModel.setModelSource(
+          defaultSpinnerModel!.source,
+          { ...defaultSpinnerModel!.asset, key: item.assetKey },
+          radius,
+        );
+      }
+    }));
+  })();
+  enemyModelsReady.catch(() => { enemyModelsReady = null; });
+  return enemyModelsReady;
 }
 
 async function applySelectedSpinnerModel(showFailureToast = true): Promise<void> {
@@ -1144,14 +1411,14 @@ async function applySelectedSpinnerModel(showFailureToast = true): Promise<void>
 
 function installInstancedEnemySpinnerModel(spinner: SpinnerState): void {
   finishSpinnerFlash(spinner);
-  finishDeathmatchProtectedVisual(spinner);
+  finishDeathmatchEliminatedVisual(spinner);
   disposeObjectChildren(spinner.spinGroup);
   spinner.modelTint = null;
 }
 
-function loadDamageNumberFont(): void {
+function loadDamageNumberFont(): Promise<void> {
   const font = new FontFace(damageNumberFontFamily, `url(${damageNumberFontUrl})`);
-  font
+  return font
     .load()
     .then((loadedFont) => {
       document.fonts.add(loadedFont);
@@ -1160,6 +1427,20 @@ function loadDamageNumberFont(): void {
     .catch((error) => {
       console.warn(`Failed to load ${damageNumberFontUrl}`, error);
     });
+}
+
+async function markPlatformPlayable(modelLoad: Promise<void>, fontLoad: Promise<void>): Promise<void> {
+  await Promise.all([modelLoad, fontLoad, waitForDocumentImages()]);
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  platform.markPlayable();
+}
+
+function waitForDocumentImages(): Promise<void> {
+  const pendingImages = Array.from(document.images).filter((image) => !image.complete);
+  return Promise.all(pendingImages.map((image) => new Promise<void>((resolve) => {
+    image.addEventListener("load", () => resolve(), { once: true });
+    image.addEventListener("error", () => resolve(), { once: true });
+  }))).then(() => {});
 }
 
 function installCustomSpinnerModel(spinner: SpinnerState, loaded: LoadedSpinnerModel): void {
@@ -1323,35 +1604,7 @@ function setupEnemyCountControl(): void {
   syncEnemyCount();
 }
 
-function setupSpinnerSizeControl(): void {
-  const input = document.querySelector<HTMLInputElement>("[data-spinner-size]");
-  const output = document.querySelector<HTMLOutputElement>("[data-spinner-size-value]");
-  if (!input) {
-    return;
-  }
-  input.value = String(spinnerSizeScale);
-  restoreStoredInputValue(input, "spinnerSize");
-
-  const syncSpinnerSize = (): void => {
-    const value = clampTextureInputValue(input, Number(input.value));
-    if (!Number.isFinite(value)) {
-      return;
-    }
-
-    input.value = String(value);
-    storeInputValue("spinnerSize", input.value);
-    if (output) {
-      output.value = value.toFixed(2);
-    }
-    applySpinnerSizeScale(value);
-  };
-
-  input.addEventListener("input", syncSpinnerSize);
-  syncSpinnerSize();
-}
-
-function applySpinnerSizeScale(scale: number): void {
-  spinnerSizeScale = scale;
+function applySpinnerSizeScale(): void {
   for (const spinner of combatSpinners) {
     spinner.radius = spinner.baseRadius * spinnerSizeScale;
     spinner.group.scale.setScalar(spinnerSizeScale);
@@ -1361,9 +1614,10 @@ function applySpinnerSizeScale(scale: number): void {
 async function startMatch(mode: GameMode): Promise<void> {
   if (matchStartPending) return;
   matchStartPending = true;
+  workshopTilePreviewRenderer.hide();
   setMatchStartButtonsDisabled(true);
   try {
-    await applySelectedSpinnerModel();
+    await Promise.all([applySelectedSpinnerModel(), prepareEnemySpinnerModels()]);
   } catch (error) {
     console.error("Failed to prepare spinner model for match", error);
     showToast(t("workshop.modelLoadFailed"));
@@ -1376,11 +1630,26 @@ async function startMatch(mode: GameMode): Promise<void> {
   selectedGameMode = mode;
   switchArena(mode);
   setEnemyCount(mode === "deathmatch" ? 9 : 1);
+  enemyOpponentNames = createOpponentNames(
+    await platform.startAsyncOpponentSession({
+      opponentCount: enemySpinners.length,
+      matchMode: getAsyncMatchMode(mode),
+    }),
+    enemySpinners.length,
+  );
+  applyOpponentIdentities();
+  randomizeEnemyAppearances();
   resetMatchState();
+  platform.recordAsyncOpponentEvent({
+    type: "match-start",
+    mode,
+    enemyCount: enemySpinners.length,
+    maxRPM: player.absoluteMaxRPM,
+    damageMultiplier: player.damageMultiplier,
+  });
   arena.visible = true;
   arenaBonusPointMarkers.visible = true;
-  applySpinnerSizeScale(spinnerSizeScale);
-  matchTimeRemaining = mode === "deathmatch" ? 180 : 0;
+  applySpinnerSizeScale();
   matchStarted = true;
   appScreen = "match";
   currentMatchResult = null;
@@ -1388,9 +1657,19 @@ async function startMatch(mode: GameMode): Promise<void> {
   pointerHasWorldTarget = false;
   mobileControls?.reset();
   gameUi.showMatch(mode);
-  if (deathmatchScoreboardButton) deathmatchScoreboardButton.hidden = mode !== "deathmatch";
+  updateDeathmatchAliveCounter();
   updateHudSystems();
   startUiUpdateTimers();
+  syncGameplayState();
+}
+
+function randomizeEnemyAppearances(): void {
+  for (const enemy of enemySpinners) {
+    const appearance = botAppearanceRandomizer.next();
+    enemy.modelAssetKey = appearance.modelAssetKey;
+    enemy.modelColor = appearance.colors[0];
+    enemy.modelColors = appearance.colors;
+  }
 }
 
 function setMatchStartButtonsDisabled(disabled: boolean): void {
@@ -1417,8 +1696,11 @@ function switchArena(mode: GameMode): void {
   arenaBonusPointMarkers = markers;
   scene.add(markers);
   pointerFallbackPlane.constant = -definition.getHeightAt(definition.radius, 0);
-  const cameraPosition = mode === "deathmatch" ? new THREE.Vector3(0, 25, 25) : new THREE.Vector3(cameraSettings.gameX, cameraSettings.gameY, cameraSettings.gameZ);
-  const lookAt = mode === "deathmatch" ? new THREE.Vector3(0, -3.5, 0) : new THREE.Vector3(cameraSettings.lookAtX, cameraSettings.lookAtY, cameraSettings.lookAtZ);
+  const cameraPosition = mode === "deathmatch" ? new THREE.Vector3(0, 24, 27) : new THREE.Vector3(cameraSettings.gameX, cameraSettings.gameY, cameraSettings.gameZ);
+  const lookAt = mode === "deathmatch" ? new THREE.Vector3(0, -4.5, 0) : new THREE.Vector3(cameraSettings.lookAtX, cameraSettings.lookAtY, cameraSettings.lookAtZ);
+  camera.fov = mode === "deathmatch" ? 40 : 50;
+  camera.updateProjectionMatrix();
+  document.body.classList.toggle("deathmatch-visual", mode === "deathmatch");
   defaultCameraPosition.copy(cameraPosition);
   defaultCameraLookAt.copy(lookAt);
   camera.position.copy(cameraPosition);
@@ -1427,11 +1709,14 @@ function switchArena(mode: GameMode): void {
 }
 
 function resetMatchState(): void {
-  closeDeathmatchOverlay();
   resetCombatState();
+  deathmatchConclusionPending = false;
+  victoryPresentationPending = false;
+  deathmatchDefeatedBeforePlayer = 0;
   deathCameraActive = false;
   deathCameraReturning = false;
   elapsedTime = 0;
+  prepareDeathmatchEliminationSlots();
   player.group.position.copy(activeArena.playerStart);
   resetParticipant(player, true);
   for (let index = 0; index < enemySpinners.length; index += 1) {
@@ -1441,13 +1726,40 @@ function resetMatchState(): void {
     botAiDirector.forget(enemy);
   }
   applyPlayerProgression();
+  applyOpponentStats();
   applyPlayerAppearance();
   hudElements = createRpmHud(player, enemySpinners);
 }
 
+function applyOpponentIdentities(): void {
+  for (const [index, enemy] of enemySpinners.entries()) {
+    enemy.name = resolveOpponentName(enemyOpponentNames[index], t);
+    enemy.avatarUrl = resolveOpponentAvatarUrl(enemyOpponentNames[index]);
+  }
+}
+
+function applyOpponentStats(): void {
+  for (const [index, enemy] of enemySpinners.entries()) {
+    const { maxRPM = absoluteMaxRPM, damageMultiplier = 1 } = resolveOpponentStats(enemyOpponentNames[index]);
+    enemy.absoluteMaxRPM = maxRPM;
+    enemy.maxRPM = maxRPM;
+    enemy.currentRPM = maxRPM;
+    enemy.damageMultiplier = damageMultiplier;
+  }
+}
+
+function getAsyncMatchMode(mode: GameMode): number {
+  return mode === "duel" ? 1 : mode === "deathmatch" ? 2 : 3;
+}
+
 function resetCombatVisualState(): void {
+  duelConclusionWinner = null;
+  deathCameraPunch.reset(camera);
   arenaBonusVfxPool.reset();
   damageNumberPool.reset();
+  spinnerDeathVfx.reset();
+  victoryLevelUpVfx.reset();
+  finalImpactOverlay.reset();
   elementalSkillVfx.reset(camera);
   lightningChainVfx.reset(camera);
 
@@ -1458,11 +1770,11 @@ function resetCombatVisualState(): void {
 
   for (const spinner of combatSpinners) {
     finishSpinnerFlash(spinner);
-    finishDeathmatchProtectedVisual(spinner);
+    finishDeathmatchEliminatedVisual(spinner);
     spinner.modelTint = null;
     spinner.spinGroup.visible = true;
     spinner.bonusEffects.length = 0;
-    spinner.critReadyVfx.group.visible = false;
+    spinner.critReadyVfx.setActive(false);
     spinner.ultimateVfx.group.visible = false;
     for (const type of arenaBonusTypes) {
       spinner.bonusAuraVfxByType[type].group.visible = false;
@@ -1483,18 +1795,15 @@ function resetCombatVisualState(): void {
 }
 
 function resetParticipant(spinner: SpinnerState, isPlayer: boolean): void {
-  spinner.deathmatchStatus = "alive";
-  spinner.respawnTimer = 0;
-  spinner.invulnerabilityTimer = 0;
+  spinner.lifeState = "alive";
+  spinner.destructionTimer = 0;
+  setSpinnerRenderVisible(spinner, true);
   spinner.kills = 0;
-  spinner.deaths = 0;
-  spinner.playerCriticalHits = 0;
   spinner.absoluteMaxRPM = absoluteMaxRPM;
   spinner.maxRPM = absoluteMaxRPM;
   spinner.currentRPM = absoluteMaxRPM;
   spinner.velocity.set(0, 0, 0);
   spinner.knockback.active = false;
-  spinner.respawnDash.active = false;
   spinner.dash.activeTimeRemaining = 0;
   spinner.dash.cooldownRemaining = 0;
   spinner.ultimate.charge = 0;
@@ -1514,7 +1823,7 @@ function resetParticipant(spinner: SpinnerState, isPlayer: boolean): void {
   spinner.lastPosition.copy(spinner.group.position);
   spinner.previousTrailPosition.copy(spinner.group.position);
   if (!isPlayer) {
-    spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.group.position));
+    spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.group.position, botCursorProjected));
     spinner.botDesiredCursorPosition.copy(spinner.botVirtualCursorPosition);
   }
 }
@@ -1532,13 +1841,16 @@ function applyPlayerProgression(): void {
   player.ultimate.settings.chargePerDamageTaken = ultimateChargeSettings.chargePerDamageTaken * ultimateMultiplier;
 }
 
-function applyPlayerAppearance(): void {
+function applyPlayerAppearance(workshopPaintColor?: string): void {
   const colors = getSelectedMaterialColorValues();
   const trail = trailCatalog.find((item) => item.id === playerProfile.selectedTrail)?.color ?? "#ffffff";
   player.modelColor = colors[0];
+  player.modelColors = [colors[0], colors[1], colors[2]];
   player.colorAccent = trail;
   player.trailVisual.setColor(trail);
-  workshopPreview.setColors(colors);
+  player.dashVfx.setColor(trail);
+  if (workshopPaintColor) workshopPreview.transitionPaint(colors, workshopPaintColor);
+  else workshopPreview.setColors(colors);
   workshopPreview.setTrailColor(trail);
   playerSpinnerVisual?.setColors(colors);
   setSelectedElement(playerProfile.selectedElement);
@@ -1552,7 +1864,16 @@ function getSelectedMaterialColorValues(): [string, string, string] {
 }
 
 function applySelectedCritAura(): void {
-  player.critReadyVfx.applyPreset(cosmeticAuraPresetById[playerProfile.selectedAura] ?? cosmeticAuraPresetById.aura_crit);
+  if (player.critReadyVfx instanceof SelectableCosmeticAuraVfx) {
+    player.critReadyVfx.setStyle(playerProfile.selectedAura);
+    player.critReadyVfx.setColor(getSelectedAuraColor());
+  }
+}
+
+function getSelectedAuraColor(): string {
+  const previewedColor = activeWorkshopCategory === "aura" ? workshopPreviewSelection.color : undefined;
+  const colorId = previewedColor ?? playerProfile.selectedAuraColor;
+  return colorCatalog.find((item) => item.id === colorId)?.color ?? "#ffd700";
 }
 
 function setupGameScreens(): void {
@@ -1560,19 +1881,66 @@ function setupGameScreens(): void {
   gameUi.bind();
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workshop-tab]")) {
     tab.addEventListener("click", () => {
-      workshopTab = tab.dataset.workshopTab === "tuning" ? "tuning" : "style";
+      workshopTab = tab.dataset.workshopTab === "tuning" ? "tuning" : tab.dataset.workshopTab === "shop" ? "shop" : "style";
+      syncWorkshopAuraPreview();
       renderWorkshop();
     });
   }
   setupWorkshopPreviewInput();
 }
 
-function openWorkshop(returnScreen: "menu" | "result"): void {
-  workshopReturnScreen = returnScreen;
+function setupPlatformAuthorization(): void {
+  const openButton = document.querySelector<HTMLButtonElement>("[data-auth-open]");
+  const dialog = document.querySelector<HTMLElement>("[data-auth-dialog]");
+  const confirmButton = document.querySelector<HTMLButtonElement>("[data-auth-confirm]");
+  const cancelButton = document.querySelector<HTMLButtonElement>("[data-auth-cancel]");
+  if (!openButton || !dialog || !confirmButton || !cancelButton) return;
+
+  const updateAvailability = (): void => {
+    openButton.hidden = !platform.isAvailable || platform.isAuthorized();
+  };
+  const close = (): void => {
+    dialog.hidden = true;
+  };
+
+  openButton.addEventListener("click", () => {
+    dialog.hidden = false;
+    confirmButton.focus();
+  });
+  cancelButton.addEventListener("click", close);
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) close();
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !dialog.hidden) close();
+  });
+  confirmButton.addEventListener("click", async () => {
+    confirmButton.disabled = true;
+    const authorized = await platform.authorize();
+    confirmButton.disabled = false;
+    close();
+    if (!authorized) return;
+
+    const cloudData = await platform.loadPlayerData();
+    const cloudProfile = parsePlayerProfile(cloudData?.profile);
+    if (cloudProfile) Object.assign(playerProfile, mergePlayerProfiles(playerProfile, cloudProfile));
+    savePlayerProfile(playerProfile);
+    applyPlayerProgression();
+    applyPlayerAppearance();
+    updatePartsBalances();
+    if (appScreen === "workshop") renderWorkshop();
+    updateAvailability();
+    showToast(t("auth.success"));
+  });
+  updateAvailability();
+}
+
+function openWorkshop(_returnScreen: "menu" | "result"): void {
   workshopPreviewSelection = {};
   activeWorkshopCategory = "model";
   gameUi.showWorkshop();
   appScreen = "workshop";
+  syncGameplayState();
   workshopElapsedTime = 0;
   restoreWorkshopPreview();
   renderWorkshop();
@@ -1581,8 +1949,7 @@ function openWorkshop(returnScreen: "menu" | "result"): void {
 function closeWorkshop(): void {
   workshopPreviewSelection = {};
   restoreWorkshopPreview();
-  if (workshopReturnScreen === "result" && currentMatchResult) showResultScreen();
-  else openMainMenu();
+  openMainMenu();
 }
 
 function renderWorkshop(): void {
@@ -1597,23 +1964,30 @@ function renderWorkshop(): void {
       profile: playerProfile,
       t,
       onUpgrade: (id) => {
-        if (!purchaseUpgrade(playerProfile, id)) showToast(t("workshop.insufficient"));
+        const purchased = purchaseUpgrade(playerProfile, id);
+        if (!purchased) {
+          showToast(t("workshop.insufficient"));
+          return;
+        }
         applyPlayerProgression();
+        workshopPreview.flashUpgrade();
         renderWorkshop();
       },
     });
-  } else {
+  } else if (workshopTab === "style") {
     renderWorkshopStyle({
       root,
       profile: playerProfile,
       items: cosmeticCatalog,
       previewSelection: workshopPreviewSelection,
       elements: elementOrder,
+      products: platformProducts,
       activeMaterialSlot,
       activeCategory: activeWorkshopCategory,
       t,
       onSelectCategory: (category) => {
         activeWorkshopCategory = category;
+        syncWorkshopAuraPreview();
         renderWorkshop();
       },
       onSelectElement: (element) => {
@@ -1629,12 +2003,21 @@ function renderWorkshop(): void {
         workshopPreview.setColors(getSelectedMaterialColorValues());
         renderWorkshop();
       },
+      onSelectAuraColor: (item) => {
+        if (!item.color) return;
+        playerProfile.selectedAuraColor = item.id;
+        workshopPreviewSelection.color = item.id;
+        savePlayerProfile(playerProfile);
+        applySelectedCritAura();
+        syncWorkshopAuraPreview();
+        renderWorkshop();
+      },
       onPreview: (item) => void previewCatalogItem(item),
       onEquip: equipCatalogItem,
       onBuy: (item, payment) => void buyCatalogItem(item, payment),
       onOffer: (productId) => void buyOffer(productId),
     });
-  }
+  } else renderWorkshopShop(root, platformProducts, t, (productId) => void buyOffer(productId));
   updatePartsBalances();
 }
 
@@ -1643,11 +2026,11 @@ async function buyCatalogItem(item: CatalogItem, payment: { kind: "parts"; amoun
     if (!purchaseItem(playerProfile, item.id, payment.amount)) showToast(t("workshop.insufficient"));
     else equipCatalogItem(item);
   } else {
-    const purchase = await localPlatform.purchase(payment.productId);
+    const purchase = await platform.purchase(payment.productId);
     if (!purchase) showToast(t("workshop.unavailable"));
     else {
-      grantOwnedItem(playerProfile, item.id);
-      equipCatalogItem(item);
+      await processPlatformPurchase(purchase);
+      if (playerProfile.ownedItems.includes(item.id)) equipCatalogItem(item);
     }
   }
   renderWorkshop();
@@ -1655,23 +2038,92 @@ async function buyCatalogItem(item: CatalogItem, payment: { kind: "parts"; amoun
 
 function equipCatalogItem(item: CatalogItem): void {
   if (item.available === false) return;
+  workshopPreviewSelection[item.category] = item.id;
+  const equippedColorChanged =
+    item.category === "color" && playerProfile.selectedMaterialColors[activeMaterialSlot] !== item.id;
+  if (item.category === "element") {
+    const element = item.id.slice("element_".length) as SpinnerElement;
+    playerProfile.selectedElement = element;
+    selectedElement = element;
+  }
   if (item.category === "model") {
     playerProfile.selectedModel = item.id;
     void applySelectedSpinnerModel();
   }
   if (item.category === "color") playerProfile.selectedMaterialColors[activeMaterialSlot] = item.id;
   if (item.category === "trail") playerProfile.selectedTrail = item.id;
-  if (item.category === "aura") playerProfile.selectedAura = item.id;
+  if (item.category === "aura" && isAuraStyleId(item.id)) playerProfile.selectedAura = item.id;
   savePlayerProfile(playerProfile);
-  applyPlayerAppearance();
-  if (item.category === "aura") workshopPreview.flashAura(item.id);
-  workshopPreviewSelection[item.category] = item.id;
+  applyPlayerAppearance(equippedColorChanged ? item.color : undefined);
+  if (item.category === "aura") syncWorkshopAuraPreview();
   renderWorkshop();
 }
 
 async function buyOffer(productId: string): Promise<void> {
-  const purchase = await localPlatform.purchase(productId);
+  const purchase = await platform.purchase(productId);
   if (!purchase) showToast(t("workshop.unavailable"));
+  else await processPlatformPurchase(purchase);
+}
+
+async function initializePlatformCommerce(): Promise<void> {
+  for (const product of await platform.getCatalog()) {
+    platformProducts.set(product.id, product);
+  }
+  for (const purchase of await platform.getPurchases()) {
+    await processPlatformPurchase(purchase);
+  }
+  if (appScreen === "workshop") renderWorkshop();
+}
+
+async function processPlatformPurchase(purchase: PlatformPurchase): Promise<void> {
+  const consumableParts = getConsumableParts(purchase.productId);
+  if (consumableParts !== null) {
+    if (!playerProfile.processedPurchaseTokens.includes(purchase.purchaseToken)) {
+      playerProfile.parts += consumableParts;
+      if (purchase.productId === "parts_21000_aura_3") grantOwnedItem(playerProfile, "aura_3");
+      playerProfile.processedPurchaseTokens.push(purchase.purchaseToken);
+      playerProfile.processedPurchaseTokens = playerProfile.processedPurchaseTokens.slice(-100);
+      savePlayerProfile(playerProfile);
+    }
+    await flushPlayerProfileSave();
+    try {
+      await platform.consumePurchase(purchase.purchaseToken);
+    } catch {
+      // The token remains recorded, so a later restore can consume it without granting twice.
+    }
+    updatePartsBalances();
+    return;
+  }
+
+  if (purchase.productId === "no_ads") {
+    if (!playerProfile.purchases.noAds) {
+      playerProfile.purchases.noAds = true;
+      addParts(playerProfile, 7500);
+      savePlayerProfile(playerProfile);
+      updatePartsBalances();
+    }
+  } else {
+    const itemId = getCatalogItemIdForProduct(purchase.productId);
+    if (itemId && cosmeticCatalog.some((item) => item.id === itemId)) {
+      grantOwnedItem(playerProfile, itemId);
+    }
+  }
+  await flushPlayerProfileSave();
+}
+
+function getConsumableParts(productId: string): number | null {
+  if (productId === "parts_7500") return 7500;
+  if (productId === "parts_21000" || productId === "parts_21000_aura_3") return 21000;
+  if (productId === "parts_50000") return 50000;
+  return null;
+}
+
+function getCatalogItemIdForProduct(productId: string): string | null {
+  if (productId.startsWith("material_color_")) return `color_${productId.slice("material_color_".length)}`;
+  if (productId.startsWith("trail_color_")) return `trail_${productId.slice("trail_color_".length)}`;
+  if (productId === "aura_3") return "aura_3";
+  if (productId.startsWith("model_")) return productId;
+  return null;
 }
 
 async function previewCatalogItem(item: CatalogItem): Promise<void> {
@@ -1692,17 +2144,31 @@ async function previewCatalogItem(item: CatalogItem): Promise<void> {
   if (item.category === "color" && item.color) {
     const previewColors = getSelectedMaterialColorValues();
     previewColors[activeMaterialSlot] = item.color;
-    workshopPreview.setColors(previewColors);
+    workshopPreview.transitionPaint(previewColors, item.color);
+    if (activeWorkshopCategory === "aura") syncWorkshopAuraPreview();
   }
   if (item.category === "trail" && item.color) workshopPreview.setTrailColor(item.color);
-  if (item.category === "aura") workshopPreview.flashAura(item.id);
+  if (item.category === "element") workshopPreview.flashElement(item.id.slice("element_".length) as SpinnerElement);
+  if (item.category === "aura") syncWorkshopAuraPreview();
+  renderWorkshop();
 }
 
 function restoreWorkshopPreview(): void {
   const trail = trailCatalog.find((item) => item.id === playerProfile.selectedTrail)?.color ?? "#ffffff";
   workshopPreview.setColors(getSelectedMaterialColorValues());
   workshopPreview.setTrailColor(trail);
+  syncWorkshopAuraPreview();
   void applySelectedSpinnerModel(false);
+}
+
+function syncWorkshopAuraPreview(): void {
+  const previewed = workshopPreviewSelection.aura;
+  const style = previewed && isAuraStyleId(previewed) ? previewed : playerProfile.selectedAura;
+  workshopPreview.setCosmeticAura(
+    style,
+    getSelectedAuraColor(),
+    appScreen === "workshop" && workshopTab === "style" && activeWorkshopCategory === "aura",
+  );
 }
 
 function setupWorkshopPreviewInput(): void {
@@ -1740,60 +2206,83 @@ function showToast(message: string): void {
 }
 
 function finishMatch(): void {
-  if (!matchStarted) return;
+  if (appScreen !== "match" || currentMatchResult) return;
   matchStarted = false;
-  const rows = getDeathmatchLeaderboardRows(getDeathmatchParticipants());
-  const playerPlace = selectedGameMode === "duel" ? (player.deathmatchStatus === "alive" ? 1 : 2) : (rows.find((row) => row.participant === player)?.rank ?? rows.length);
-  const won = playerPlace === 1;
-  const reward = calculateMatchReward(selectedGameMode, won, player.kills, playerPlace);
+  audioManager.stopAll();
+  syncGameplayState();
+  const won = isSpinnerAlive(player);
+  const defeatedBeforePlayer = selectedGameMode === "deathmatch" && won
+    ? getDeathmatchParticipants().length - 1
+    : deathmatchDefeatedBeforePlayer;
+  const reward = calculateMatchReward(selectedGameMode, won, defeatedBeforePlayer);
   currentMatchResult = {
     mode: selectedGameMode,
-    outcome: selectedGameMode === "duel" ? (won ? "victory" : "defeat") : "placed",
-    place: playerPlace,
-    kills: player.kills,
+    outcome: won ? "victory" : "defeat",
     partsEarned: reward,
     bonusClaimed: false,
   };
+  platform.recordAsyncOpponentEvent({
+    type: "match-finish",
+    elapsedMs: Math.round(elapsedTime * 1_000),
+    won,
+  });
+  void platform.finishAsyncOpponentSession(getAsyncMatchMode(selectedGameMode));
   playerProfile.totalMatches += 1;
   playerProfile.kills += player.kills;
   if (won) playerProfile.wins += 1;
   addParts(playerProfile, reward);
   savePlayerProfile(playerProfile);
-  closeDeathmatchOverlay();
   resetCombatVisualState();
   showResultScreen();
-  if (!playerProfile.purchases.noAds && playerProfile.totalMatches % 3 === 0) void localPlatform.showInterstitialAd();
 }
 
 function showResultScreen(): void {
   if (!currentMatchResult) return;
   gameUi.showResult();
   appScreen = "result";
+  syncGameplayState();
+  const resultCard = document.querySelector<HTMLElement>("[data-result-card]");
+  if (resultCard) resultCard.dataset.resultTheme = currentMatchResult.outcome === "victory" ? "victory" : "lose";
   const title = document.querySelector<HTMLElement>("[data-result-title]");
-  if (title) title.textContent = currentMatchResult.outcome === "victory" ? t("result.victory") : currentMatchResult.outcome === "defeat" ? t("result.defeat") : `#${currentMatchResult.place}`;
+  if (title) title.textContent = currentMatchResult.outcome === "victory" ? t("result.victory") : t("result.defeat");
   const stats = document.querySelector<HTMLElement>("[data-result-stats]");
-  if (stats) {
-    const rows = getResultStatRows(currentMatchResult, t);
-    stats.replaceChildren(...rows.map((value) => Object.assign(document.createElement("div"), { textContent: value })));
-  }
+  stats?.replaceChildren();
   const reward = document.querySelector<HTMLElement>("[data-result-reward]");
   if (reward) reward.textContent = `+${currentMatchResult.partsEarned}${currentMatchResult.bonusClaimed ? " ×2" : ""}`;
   const doubleButton = document.querySelector<HTMLButtonElement>("[data-result-double]");
-  if (doubleButton) doubleButton.disabled = currentMatchResult.bonusClaimed;
+  const doubleButtonLabel = doubleButton?.querySelector<HTMLElement>("[data-result-double-label]");
+  if (doubleButton && doubleButtonLabel) {
+    doubleButtonLabel.textContent = currentMatchResult.bonusClaimed
+      ? t("result.doubleClaimed")
+      : t("result.double");
+    doubleButton.disabled = currentMatchResult.bonusClaimed || rewardedAdPending;
+  }
   updatePartsBalances();
 }
 
 async function claimDoubleReward(): Promise<void> {
-  if (!currentMatchResult || currentMatchResult.bonusClaimed) return;
-  if (!await localPlatform.showRewardedAd()) return;
-  currentMatchResult.bonusClaimed = true;
-  addParts(playerProfile, currentMatchResult.partsEarned);
+  if (!currentMatchResult || currentMatchResult.bonusClaimed || rewardedAdPending) return;
+  rewardedAdPending = true;
   showResultScreen();
+  try {
+    await adManager.showRewardedAd(async () => {
+      if (!currentMatchResult || currentMatchResult.bonusClaimed) return;
+      currentMatchResult.bonusClaimed = true;
+      addParts(playerProfile, currentMatchResult.partsEarned);
+      await flushPlayerProfileSave();
+      showResultScreen();
+    });
+  } finally {
+    rewardedAdPending = false;
+    if (currentMatchResult) showResultScreen();
+  }
 }
 
 function openMainMenu(): void {
+  audioManager.stopAll();
   matchStarted = false;
   appScreen = "mainMenu";
+  syncGameplayState();
   gameUi.showMainMenu();
   updatePartsBalances();
 }
@@ -1818,26 +2307,6 @@ function setupMobileControls(): void {
   });
 }
 
-function setupDeathmatchContinueButton(): void {
-  deathmatchScoreboardButton?.addEventListener("click", () => {
-    if (deathmatchOverlayOpen) {
-      closeDeathmatchOverlay();
-    } else {
-      openDeathmatchOverlay(false);
-    }
-  });
-
-  deathmatchContinueButton?.addEventListener("click", () => {
-    if (player.deathmatchStatus !== "respawning" || player.respawnTimer > 0) {
-      return;
-    }
-    startDeathmatchRespawnDash(player);
-    if (deathmatchOverlayOpenedByDeath) {
-      closeDeathmatchOverlay();
-    }
-  });
-}
-
 function setSelectedElement(element: SpinnerElement): void {
   selectedElement = element;
   if (selectedElement !== "lightning") {
@@ -1858,42 +2327,10 @@ function replaceUltimateVfx(spinner: SpinnerState, preset: TornadoVfxPreset): vo
   spinner.group.add(spinner.ultimateVfx.group);
 }
 
-function setupBotDifficultyControls(): void {
-  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-bot-difficulty]"));
-  const storedDifficulty = localStorage.getItem(`${debugSettingStoragePrefix}botDifficulty`);
-  if (isBotDifficulty(storedDifficulty)) {
-    botDifficulty = storedDifficulty;
-  }
-
-  const applyDifficulty = (difficulty: BotDifficulty): void => {
-    botDifficulty = difficulty;
-    botAiDecisionCountdown = 0;
-    botAiDecisionElapsedTime = 0;
-    storeInputValue("botDifficulty", difficulty);
-    for (const button of buttons) {
-      button.classList.toggle("active", button.dataset.botDifficulty === difficulty);
-    }
-  };
-
-  for (const button of buttons) {
-    const difficulty = button.dataset.botDifficulty;
-    if (!isBotDifficulty(difficulty)) {
-      continue;
-    }
-    button.addEventListener("click", () => applyDifficulty(difficulty));
-  }
-
-  applyDifficulty(botDifficulty);
-}
-
 function clampTextureInputValue(rangeInput: HTMLInputElement, value: number): number {
   const min = rangeInput.min === "" ? -Infinity : Number(rangeInput.min);
   const max = rangeInput.max === "" ? Infinity : Number(rangeInput.max);
   return THREE.MathUtils.clamp(value, min, max);
-}
-
-function isBotDifficulty(value: string | null | undefined): value is BotDifficulty {
-  return value === "easy" || value === "normal" || value === "hard";
 }
 
 function restoreStoredInputValue(input: HTMLInputElement, key: string | undefined): void {
@@ -1916,20 +2353,6 @@ function restoreStoredInputValue(input: HTMLInputElement, key: string | undefine
   input.value = String(THREE.MathUtils.clamp(value, min, max));
 }
 
-function getStoredDebugNumber(key: string, min: number, max: number, fallback: number): number {
-  const storedValue = localStorage.getItem(`${debugSettingStoragePrefix}${key}`);
-  if (storedValue === null) {
-    return fallback;
-  }
-
-  const value = Number(storedValue);
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return THREE.MathUtils.clamp(value, min, max);
-}
-
 function storeInputValue(key: string | undefined, value: string): void {
   if (!key) {
     return;
@@ -1949,24 +2372,11 @@ function updateRpmHud(elements: RpmHudElements[]): void {
     }
 
     element.root.hidden = false;
-    element.root.classList.toggle("respawning", spinner.deathmatchStatus === "respawning");
-    element.root.classList.toggle("invulnerable", spinner.deathmatchStatus === "alive" && spinner.invulnerabilityTimer > 0);
-    if (spinner.deathmatchStatus === "respawning") {
-      element.fill.style.transform = "scaleX(0)";
-      element.cap.style.transform = "scaleX(0)";
-      element.value.textContent = `${t("hud.respawn").toUpperCase()} ${spinner.respawnTimer.toFixed(1)}s`;
-      if (element.bonusIcons) {
-        element.bonusIcons.hidden = true;
-      }
-      continue;
-    }
-
     const currentRatio = spinner.absoluteMaxRPM > 0 ? THREE.MathUtils.clamp(spinner.currentRPM / spinner.absoluteMaxRPM, 0, 1) : 0;
     const capRatio = spinner.absoluteMaxRPM > 0 ? THREE.MathUtils.clamp(spinner.maxRPM / spinner.absoluteMaxRPM, 0, 1) : 0;
     element.fill.style.transform = `scaleX(${currentRatio})`;
     element.cap.style.transform = `scaleX(${capRatio})`;
-    const invulnerabilityLabel = spinner.invulnerabilityTimer > 0 ? ` · ${t("hud.invulnerable").toUpperCase()} ${spinner.invulnerabilityTimer.toFixed(1)}s` : "";
-    element.value.textContent = `${Math.ceil(spinner.currentRPM)} / ${Math.ceil(spinner.maxRPM)} RPM${invulnerabilityLabel}`;
+    element.value.textContent = `${Math.ceil(spinner.currentRPM)} / ${Math.ceil(spinner.maxRPM)} ${t("hud.health")}`;
     if (element.bonusIcons) {
       updatePlayerBonusHud(element.bonusIcons, spinner);
     }
@@ -1990,9 +2400,10 @@ function updatePlayerBonusHud(root: HTMLElement, spinner: SpinnerState): void {
     const icon = document.createElement("div");
     icon.className = "bonus-icon";
     icon.style.setProperty("--bonus-color", arenaBonusColorByType[type]);
-    icon.title = arenaBonusHudLabelByType[type];
+    const label = t(arenaBonusHudLabelKeyByType[type]);
+    icon.title = label;
     icon.setAttribute("role", "img");
-    icon.setAttribute("aria-label", `${arenaBonusHudLabelByType[type]} ${Math.ceil(effect.timeRemaining)} seconds`);
+    icon.setAttribute("aria-label", `${label} ${Math.ceil(effect.timeRemaining)} ${t("unit.secondsShort")}`);
 
     const fill = document.createElement("div");
     fill.className = "bonus-icon-fill";
@@ -2006,75 +2417,17 @@ function updatePlayerBonusHud(root: HTMLElement, spinner: SpinnerState): void {
   }
 }
 
-function updateDeathmatchLeaderboard(): void {
-  if (!deathmatchLeaderboardElement || !deathmatchOverlayOpen) {
-    return;
+function updateDeathmatchAliveCounter(): void {
+  if (!deathmatchAliveCounterElement) return;
+  const visible = selectedGameMode === "deathmatch" && appScreen === "match";
+  deathmatchAliveCounterElement.hidden = !visible;
+  if (!visible) return;
+
+  const participants = getDeathmatchParticipants();
+  const nextValue = formatAliveCounter(countAliveDeathmatchParticipants(participants), participants.length);
+  if (deathmatchAliveCounterElement.textContent !== nextValue) {
+    deathmatchAliveCounterElement.textContent = nextValue;
   }
-  renderFullLeaderboard(deathmatchLeaderboardElement, getLeaderboardViewRows(), t);
-}
-
-function getLeaderboardViewRows(): LeaderboardViewRow[] {
-  return getDeathmatchLeaderboardRows(getDeathmatchParticipants()).map((row) => ({
-    id: row.participant.participantId,
-    rank: row.rank,
-    name: row.participant.name,
-    kills: row.participant.kills,
-    deaths: row.participant.deaths,
-    criticalHits: row.participant === player ? row.participant.playerCriticalHits : 0,
-    rating: row.rating,
-    player: row.participant === player,
-    respawning: row.participant.deathmatchStatus === "respawning",
-    invulnerable: row.participant.deathmatchStatus === "alive" && row.participant.invulnerabilityTimer > 0,
-  }));
-}
-
-function openDeathmatchOverlay(openedByDeath: boolean): void {
-  deathmatchOverlayOpen = true;
-  deathmatchOverlayOpenedByDeath = openedByDeath;
-  updateDeathmatchOverlay();
-  updateDeathmatchLeaderboard();
-}
-
-function closeDeathmatchOverlay(): void {
-  deathmatchOverlayOpen = false;
-  deathmatchOverlayOpenedByDeath = false;
-  updateDeathmatchOverlay();
-}
-
-function updateDeathmatchOverlay(): void {
-  deathmatchOverlayElement?.toggleAttribute("hidden", !deathmatchOverlayOpen);
-  deathmatchScoreboardButton?.classList.toggle("active", deathmatchOverlayOpen);
-  if (deathmatchScoreboardButton) {
-    deathmatchScoreboardButton.setAttribute("aria-pressed", String(deathmatchOverlayOpen));
-  }
-}
-
-function updateDeathmatchContinueButton(): void {
-  if (!deathmatchContinueButton) {
-    return;
-  }
-
-  const playerRespawning = player.deathmatchStatus === "respawning";
-  deathmatchContinueButton.hidden = !playerRespawning;
-  deathmatchContinueButton.classList.toggle("ready", playerRespawning && player.respawnTimer <= 0);
-  if (!playerRespawning) {
-    deathmatchContinueButton.disabled = true;
-    setButtonLabel(deathmatchContinueButton, t("hud.continue"));
-    return;
-  }
-
-  const ready = player.respawnTimer <= 0;
-  deathmatchContinueButton.disabled = !ready;
-  setButtonLabel(deathmatchContinueButton, ready ? t("hud.continue") : `${t("hud.continueIn")} ${Math.ceil(player.respawnTimer)}s`);
-}
-
-function setButtonLabel(button: HTMLButtonElement, label: string): void {
-  let labelElement = button.querySelector("span");
-  if (!labelElement) {
-    labelElement = document.createElement("span");
-    button.replaceChildren(labelElement);
-  }
-  labelElement.textContent = label;
 }
 
 function updateDashHud(elements: DashHudElements | null): void {
@@ -2091,7 +2444,11 @@ function updateDashHud(elements: DashHudElements | null): void {
   elements.root.classList.toggle("ready", ready);
   elements.root.classList.toggle("active", active);
   elements.fill.style.transform = `scaleX(${progress})`;
-  elements.value.textContent = active ? t("hud.dash").toUpperCase() : ready ? t("hud.ready").toUpperCase() : `${dash.cooldownRemaining.toFixed(1)}s`;
+  elements.value.textContent = active
+    ? t("hud.dash").toUpperCase()
+    : ready
+      ? t("hud.ready").toUpperCase()
+      : `${dash.cooldownRemaining.toFixed(1)} ${t("unit.secondsShort")}`;
 }
 
 function updateUltimateHud(elements: UltimateHudElements | null): void {
@@ -2109,7 +2466,7 @@ function updateUltimateHud(elements: UltimateHudElements | null): void {
   elements.root.classList.toggle("active", active);
   elements.fill.style.transform = `scaleX(${active ? activeRatio : ratio})`;
   elements.value.textContent = active
-    ? `${t("hud.active").toUpperCase()} ${player.ultimate.activeTimeRemaining.toFixed(1)}s`
+    ? `${t("hud.active").toUpperCase()} ${player.ultimate.activeTimeRemaining.toFixed(1)} ${t("unit.secondsShort")}`
     : ready
       ? t("hud.ready").toUpperCase()
       : `${Math.floor(ratio * 100)}%`;
@@ -2147,6 +2504,11 @@ function updateFpsCounter(deltaTime: number): void {
 
   const fps = Math.round(fpsFrameCount / fpsElapsedTime);
   fpsCounterElement.textContent = `FPS: ${fps}`;
+  if (import.meta.env.DEV) {
+    renderer.domElement.dataset.drawCalls = String(renderer.info.render.calls);
+    renderer.domElement.dataset.triangles = String(renderer.info.render.triangles);
+    renderer.domElement.dataset.textures = String(renderer.info.memory.textures);
+  }
   fpsFrameCount = 0;
   fpsElapsedTime = 0;
 }
@@ -2176,7 +2538,7 @@ function handlePointerDown(event: PointerEvent): void {
 }
 
 function updatePlayerPointerTarget(clientX: number, clientY: number): THREE.Vector3 | null {
-  if (!isDeathmatchAlive(player) || player.respawnDash.active) {
+  if (!isSpinnerAlive(player)) {
     return null;
   }
 
@@ -2191,7 +2553,7 @@ function updatePlayerPointerTarget(clientX: number, clientY: number): THREE.Vect
 }
 
 function tryStartPlayerDash(target: THREE.Vector3): void {
-  if (!isDeathmatchAlive(player) || player.knockback.active || player.respawnDash.active) {
+  if (!isSpinnerAlive(player) || player.knockback.active) {
     return;
   }
 
@@ -2216,26 +2578,41 @@ function tryStartPlayerMobileDash(): void {
 }
 
 function tryStartPlayerDashInDirection(direction: THREE.Vector3): void {
-  if (!isDeathmatchAlive(player) || player.knockback.active || player.respawnDash.active) {
+  if (!isSpinnerAlive(player) || player.knockback.active) {
     return;
   }
 
-  tryStartDash(player.dash, { x: direction.x, z: direction.z });
+  if (tryStartDash(player.dash, { x: direction.x, z: direction.z })) {
+    audioManager.playDash();
+    player.dashVfx.beginDashVFX(player.group.position);
+    playerDashVfxFollowRemaining = player.dash.settings.duration + playerDashVfxLingerDuration;
+  }
+}
+
+function updatePlayerDashVfx(deltaTime: number): void {
+  if (playerDashVfxFollowRemaining > 0) {
+    player.dashVfx.updateDashVFX(player.group.position);
+    playerDashVfxFollowRemaining = Math.max(0, playerDashVfxFollowRemaining - deltaTime);
+    if (playerDashVfxFollowRemaining === 0) player.dashVfx.finishDashVFX();
+  }
+  player.dashVfx.update(deltaTime);
 }
 
 function tryActivatePlayerUltimate(): void {
-  if (!isDeathmatchAlive(player) || player.respawnDash.active) {
+  if (!isSpinnerAlive(player)) {
     return;
   }
 
   if (tryActivateUltimate(player.ultimate)) {
+    audioManager.playUltimateStart(selectedElement);
+    audioManager.startAura(selectedElement);
     player.pulseTimer = 0.28;
     const result = activateElementalSkill(
       elementalSkillState,
       player,
       enemySpinners,
       selectedElement,
-      (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+      isSpinnerDamageable,
     );
     const damage = applyElementalSkillResult(result);
     processDamageEvents(damage.damageEvents);
@@ -2253,8 +2630,6 @@ function refreshSpinnerSurfaceHeights(): void {
     spinner.botDesiredCursorPosition.copy(projectToArenaSurface(spinner.botDesiredCursorPosition));
     spinner.knockback.fromPosition.copy(projectToArenaSurface(spinner.knockback.fromPosition));
     spinner.knockback.toPosition.copy(projectToArenaSurface(spinner.knockback.toPosition));
-    spinner.respawnDash.fromPosition.copy(projectToArenaSurface(spinner.respawnDash.fromPosition));
-    spinner.respawnDash.toPosition.copy(projectToArenaSurface(spinner.respawnDash.toPosition));
     spinner.trailPoints.length = 0;
     spinner.previousTrailPosition.copy(spinner.group.position);
   }
@@ -2327,22 +2702,7 @@ function simulatePhysicsTick(deltaTime: number): void {
   if (!matchStarted) return;
   elapsedTime += deltaTime;
 
-  if (selectedGameMode === "deathmatch") {
-    matchTimeRemaining = Math.max(0, matchTimeRemaining - deltaTime);
-    if (matchTimeRemaining <= 0) {
-      finishMatch();
-      return;
-    }
-  }
-
-  updateDeathmatchRespawns(deltaTime);
-  updateRespawnDashes(deltaTime);
-  updatePlayer(deltaTime);
-  updateEnemyAi(deltaTime);
-  updateArenaBonusSystems(deltaTime);
-  updateHealingZones(deltaTime);
-
-  const auraActive = isUltimateActive(player.ultimate) && isDeathmatchDamageable(player) && !player.respawnDash.active;
+  const auraActive = isUltimateActive(player.ultimate) && isSpinnerDamageable(player);
   syncElementalCollisionModifiers(player, selectedElement, auraActive);
   const elementalTickResult = updateElementalSkills(
     elementalSkillState,
@@ -2350,12 +2710,19 @@ function simulatePhysicsTick(deltaTime: number): void {
     enemySpinners,
     auraActive,
     deltaTime,
-    (spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active,
+    isSpinnerDamageable,
   );
   const elementalDamage = applyElementalSkillResult(elementalTickResult);
   processDamageEvents(elementalDamage.damageEvents);
+  if (!matchStarted) return;
+
+  updatePlayer(deltaTime);
+  updateEnemyAi(deltaTime);
+  updateArenaBonusSystems(deltaTime);
+  updateHealingZones(deltaTime);
 
   const collisionResult = handleSpinnerCollisions(getDeathmatchDamageableSpinners(), elapsedTime);
+  for (const event of collisionResult.damageEvents) audioManager.playHit(event.critical, event.source !== player);
   for (const knockback of collisionResult.knockbacks) {
     startSpinnerKnockback(knockback);
   }
@@ -2376,7 +2743,7 @@ function simulatePhysicsTick(deltaTime: number): void {
   }
 
   for (const spinner of combatSpinners) {
-    if (!isDeathmatchAlive(spinner)) {
+    if (!isSpinnerAlive(spinner)) {
       continue;
     }
     updateUltimateActive(spinner.ultimate, deltaTime);
@@ -2387,7 +2754,30 @@ function simulatePhysicsTick(deltaTime: number): void {
     ...collisionResult.damageEvents,
     ...lightningChainResult.damageEvents,
   ]);
+  if (!isUltimateActive(player.ultimate)) audioManager.stopAura();
+  updateSelectedEnemySpinGroups(deltaTime);
+  audioManager.updateSpinners(player.group, selectedEnemySpinGroups, matchStarted && isSpinnerAlive(player));
 
+}
+
+function updateSelectedEnemySpinGroups(deltaTime: number): void {
+  enemySpinSelectionElapsed += deltaTime;
+  if (enemySpinSelectionElapsed < enemySpinSelectionInterval) return;
+  enemySpinSelectionElapsed -= enemySpinSelectionInterval;
+  selectedEnemySpinGroups.length = 0;
+  for (const spinner of enemySpinners) {
+    if (!isSpinnerAlive(spinner)) continue;
+    selectedEnemySpinGroups.push(spinner.group);
+    if (selectedEnemySpinGroups.length === 4) break;
+  }
+}
+
+function removeSelectedEnemySpinGroup(group: THREE.Object3D): void {
+  for (let index = 0; index < selectedEnemySpinGroups.length; index += 1) {
+    if (selectedEnemySpinGroups[index] !== group) continue;
+    selectedEnemySpinGroups.splice(index, 1);
+    return;
+  }
 }
 
 function updateLightningChainCombat(
@@ -2410,6 +2800,7 @@ function updateLightningChainCombat(
     const applied = applyDirectDamage(command.source, command.target, command.amount, command.direction);
     if (applied.damageEvent) {
       result.push(applied.damageEvent);
+      audioManager.playElementStrike("lightning");
     }
     if (applied.damageNumber) {
       spawnDamageNumber(applied.damageNumber);
@@ -2422,13 +2813,11 @@ function canStartLightningChain(event: CombatDamageEvent<SpinnerState>): boolean
   return (
     selectedElement === "lightning" &&
     isUltimateActive(player.ultimate) &&
-    isDeathmatchDamageable(player) &&
-    !player.respawnDash.active &&
+    isSpinnerDamageable(player) &&
     event.source === player &&
     event.target !== player &&
     enemySpinners.includes(event.target) &&
-    isDeathmatchDamageable(event.target) &&
-    !event.target.respawnDash.active
+    isSpinnerDamageable(event.target)
   );
 }
 
@@ -2454,22 +2843,51 @@ function applyElementalSkillResult(
   }
   for (const command of result.freezeCommands) {
     enemySpinnerInstancedModel.setFrozen(command.target, command.frozen);
+    if (command.frozen) audioManager.playFreeze();
     if (!command.frozen) {
       elementalSkillVfx.spawnThawShards(command.target.group.position, command.target.radius, reducedMotionQuery.matches);
     }
   }
   for (const position of result.rockRipplePositions) {
     elementalSkillVfx.spawnRockRipple(position);
+    audioManager.playElementStrike("earth");
   }
   return { damageEvents };
 }
 
 function processDamageEvents(damageEvents: CombatDamageEvent<SpinnerState>[]): void {
+  const hitVfxPairs = new Set<string>();
   for (const event of damageEvents) {
-    elementalSkillVfx.spawnHit(event, reducedMotionQuery.matches);
+    if (event.source === player && selectedElement === "fire" && isUltimateActive(player.ultimate)) audioManager.playElementStrike("fire");
+    if (event.source === player && selectedElement === "ice" && event.target.elementalMovementLocked) audioManager.playElementStrike("ice");
+    const hitVfxPair = getHitVfxPairKey(event);
+    if (!hitVfxPairs.has(hitVfxPair)) {
+      hitVfxPairs.add(hitVfxPair);
+      const lethal = event.target.maxRPM < spinnerDeathRpmThreshold;
+      elementalSkillVfx.spawnHit(event, reducedMotionQuery.matches, getHitVfxScale(event), lethal ? 40 : 16);
+      if (event.source === player || event.target === player) {
+        elementalSkillVfx.spawnPlayerHitSlash(event, player.modelColors[0], player.modelColors[1]);
+      }
+    }
   }
   applyUltimateChargeFromDamage(damageEvents);
   updateDeathmatchScores(damageEvents);
+}
+
+function getHitVfxPairKey(event: CombatDamageEvent<SpinnerState>): string {
+  const sourceIndex = combatSpinners.indexOf(event.source);
+  const targetIndex = combatSpinners.indexOf(event.target);
+  const firstIndex = Math.min(sourceIndex, targetIndex);
+  const secondIndex = Math.max(sourceIndex, targetIndex);
+  return `${firstIndex}:${secondIndex}:${event.position.x.toFixed(3)}:${event.position.y.toFixed(3)}:${event.position.z.toFixed(3)}`;
+}
+
+function getHitVfxScale(event: CombatDamageEvent<SpinnerState>): number {
+  if (event.target.maxRPM < spinnerDeathRpmThreshold) return 2.6;
+  if (event.target === player) {
+    return 1.5;
+  }
+  return event.source === player ? 2 : 1;
 }
 
 function getDeathmatchParticipants(): SpinnerState[] {
@@ -2477,41 +2895,208 @@ function getDeathmatchParticipants(): SpinnerState[] {
 }
 
 function getDeathmatchDamageableSpinners(): SpinnerState[] {
-  return getDeathmatchParticipants().filter((spinner) => isDeathmatchDamageable(spinner) && !spinner.respawnDash.active);
-}
-
-function updateDeathmatchRespawns(deltaTime: number): void {
-  for (const spinner of getDeathmatchParticipants()) {
-    if (spinner.deathmatchStatus === "respawning") {
-      spinner.respawnTimer = Math.max(0, spinner.respawnTimer - deltaTime);
-      if (selectedGameMode === "deathmatch" && spinner.respawnTimer <= 0) {
-        startDeathmatchRespawnDash(spinner);
-      }
-      continue;
-    }
-
-    spinner.invulnerabilityTimer = Math.max(0, spinner.invulnerabilityTimer - deltaTime);
-  }
+  return getDeathmatchParticipants().filter(isSpinnerDamageable);
 }
 
 function updateDeathmatchScores(damageEvents: CombatDamageEvent<SpinnerState>[]): void {
-  recordPlayerCriticalHits(damageEvents, player);
-  const deaths = applyDeathmatchDeaths(getDeathmatchParticipants(), damageEvents, deathmatchSettings);
+  const participants = getDeathmatchParticipants();
+  const eliminatedBeforeThisStep = participants.length - countAliveDeathmatchParticipants(participants);
+  if (selectedGameMode === "deathmatch") preserveFinalDeathmatchSurvivor(participants);
+  const deaths = collectSpinnerDeaths(participants, damageEvents);
+  if (deaths.length === 0) return;
+
+  const playerDefeated = selectedGameMode === "deathmatch" && deaths.some((death) => death.victim === player);
+  if (playerDefeated) {
+    deathmatchDefeatedBeforePlayer = eliminatedBeforeThisStep;
+  }
+  recordDeathmatchEliminations(deaths);
+  const survivors = getDeathmatchParticipants().filter(isSpinnerAlive);
+  const finalDeath = selectedGameMode === "duel" || playerDefeated || (selectedGameMode === "deathmatch" && survivors.length === 1);
+  const playerDeath = deaths.find((death) => death.victim === player);
+  const presentationWinner = playerDefeated ? playerDeath?.killer ?? null : survivors.length === 1 ? survivors[0] : null;
+  if (finalDeath && presentationWinner) {
+    startFinalImpactPresentation(presentationWinner, playerDeath ?? deaths[0]);
+  }
+  for (const death of deaths) startSpinnerDestruction(death, finalDeath);
   if (selectedGameMode === "duel" && deaths.length > 0) {
-    finishMatch();
+    duelConclusionWinner = survivors.length === 1 ? survivors[0] : null;
+    if (duelConclusionWinner) {
+      if (duelConclusionWinner.knockback.active) {
+        duelConclusionWinner.velocity.subVectors(
+          duelConclusionWinner.knockback.toPosition,
+          duelConclusionWinner.knockback.fromPosition,
+        );
+        const coastSpeed = THREE.MathUtils.clamp(
+          duelConclusionWinner.velocity.length() / Math.max(duelConclusionWinner.knockback.duration, 0.001),
+          0,
+          10,
+        );
+        if (duelConclusionWinner.velocity.lengthSq() > 0.000001) duelConclusionWinner.velocity.setLength(coastSpeed);
+      }
+      duelConclusionWinner.knockback.active = false;
+      duelConclusionWinner.dash.activeTimeRemaining = 0;
+      if (duelConclusionWinner.targetLine) duelConclusionWinner.targetLine.line.visible = false;
+    }
+    pointerHasWorldTarget = false;
+    mobileControls?.reset();
+    matchStarted = false;
+    syncGameplayState();
     return;
   }
-  for (const death of deaths) {
-    startDeathmatchRespawn(death.victim);
+
+  if (playerDefeated) {
+    pointerHasWorldTarget = false;
+    mobileControls?.reset();
+    matchStarted = false;
+    syncGameplayState();
+    return;
+  }
+
+  updateDeathmatchAliveCounter();
+  if (selectedGameMode === "deathmatch" && countAliveDeathmatchParticipants(participants) === 1) {
+    deathmatchConclusionPending = true;
+    pointerHasWorldTarget = false;
+    mobileControls?.reset();
+    matchStarted = false;
+    syncGameplayState();
   }
 }
 
-function startDeathmatchRespawn(spinner: SpinnerState): void {
-  const edgePoint = spinner === player ? getPlayerDeathEdgeSpawnPoint() : getArenaEdgePoint(spinner.group.position);
-  spinner.group.position.copy(edgePoint);
-  spinner.deathmatchStatus = "respawning";
-  spinner.respawnTimer = spinner === player ? playerContinueDelay : botRespawnDelay;
-  spinner.invulnerabilityTimer = 0;
+function startSpinnerDestruction(death: SpinnerDeath<SpinnerState>, delayVfxForFinalImpact = false): void {
+  const spinner = death.victim;
+  if (spinner === player) audioManager.stopAll();
+  spinner.spinGroup.updateWorldMatrix(true, false);
+  const impactPosition = death.impact?.position.clone() ?? spinner.group.position.clone();
+  impactPosition.y = Math.max(impactPosition.y, spinner.group.position.y + spinner.radius * 0.65);
+  const impactDirection = death.impact?.direction.clone() ?? spinner.forwardDirection.clone();
+  const snapshot: SpinnerDeathSnapshot = {
+    matrixWorld: spinner.spinGroup.matrixWorld.clone(),
+    colors: spinner.modelColors,
+    inheritedVelocity: spinner.velocity.clone(),
+    impactDirection,
+    impactPosition,
+  };
+  spinnerDeathVfx.play(snapshot, reducedMotionQuery.matches, delayVfxForFinalImpact ? 0.75 : 0);
+  if (death.victim === player || death.killer === player) {
+    deathCameraPunch.trigger(impactDirection, reducedMotionQuery.matches);
+  }
+  setSpinnerRenderVisible(spinner, false);
+  spinner.velocity.set(0, 0, 0);
+  spinner.currentRPM = 0;
+  spinner.maxRPM = 0;
+  spinner.knockback.active = false;
+  spinner.dash.activeTimeRemaining = 0;
+  spinner.dash.cooldownRemaining = 0;
+  spinner.ultimate.charge = 0;
+  spinner.ultimate.activeTimeRemaining = 0;
+  spinner.bonusEffects.length = 0;
+  spinner.bonusSpeedMultiplier = 1;
+  spinner.verticalLaunchActive = false;
+  spinner.verticalVelocity = 0;
+  spinner.distanceMovedThisTick = 0;
+  lightningChainVfx.cancelForSpinner(spinner);
+  if (spinner === player) {
+    for (const frozenTarget of resetElementalSkillState(elementalSkillState, enemySpinners)) {
+      enemySpinnerInstancedModel.setFrozen(frozenTarget, false);
+    }
+    syncElementalCollisionModifiers(player, selectedElement, false);
+  } else {
+    clearElementalTarget(elementalSkillState, spinner);
+    enemySpinnerInstancedModel.setFrozen(spinner, false);
+  }
+  finishSpinnerFlash(spinner);
+  clearSpinnerTrail(spinner);
+  hideSpinnerTrailAndTarget(spinner);
+  latestEnemyAiCommands.delete(spinner);
+  if (spinner === player && selectedGameMode === "deathmatch") {
+    pointerHasWorldTarget = false;
+    savedCameraPosition.copy(camera.position);
+    savedCameraLookAt.copy(cameraLookAtTarget);
+    deathCameraActive = true;
+    deathCameraReturning = false;
+  }
+}
+
+function handleSpinnerDestructionComplete(spinner: SpinnerState): void {
+  if (spinner !== player) {
+    audioManager.stopEnemySpin(spinner.group);
+    removeSelectedEnemySpinGroup(spinner.group);
+  }
+  if (appScreen !== "match" || spinner.lifeState !== "destroying") return;
+  if (selectedGameMode === "duel") return;
+  if (selectedGameMode !== "deathmatch") return;
+
+  eliminateDeathmatchSpinner(spinner);
+}
+
+function startFinalImpactPresentation(winner: SpinnerState, death: SpinnerDeath<SpinnerState>): void {
+  if (victoryPresentationPending || currentMatchResult) return;
+  victoryPresentationPending = true;
+  const impactPosition = death.impact?.position ?? death.victim.group.position;
+  finalImpactOverlay.triggerImpact(impactPosition, {
+    text: winner === player ? t("result.victory") : t("result.defeat"),
+    ...(winner === player ? victoryImpactStyle : defeatImpactStyle),
+  });
+  victoryLevelUpVfx.triggerPowerUp(winner.spinGroup, reducedMotionQuery.matches);
+}
+
+function finishMatchAfterVictoryPresentation(): void {
+  if (!victoryPresentationPending || finalImpactOverlay.isActive()) return;
+  victoryPresentationPending = false;
+  finishMatch();
+}
+
+function updateDuelConclusionPresentation(deltaTime: number): void {
+  const winner = duelConclusionWinner;
+  if (!winner || selectedGameMode !== "duel" || !isSpinnerAlive(winner)) return;
+  elapsedTime += deltaTime;
+  const previousX = winner.group.position.x;
+  const previousY = winner.group.position.y;
+  const previousZ = winner.group.position.z;
+  winner.group.position.addScaledVector(winner.velocity, deltaTime);
+  winner.velocity.multiplyScalar(getDuelWinnerCoastVelocityScale(deltaTime));
+  if (!activeArena.contains(winner.group.position, -winner.radius * 0.3)) {
+    winner.group.position.copy(activeArena.clampPoint(winner.group.position, winner.radius * 0.3));
+    winner.velocity.multiplyScalar(-0.15);
+  }
+  winner.group.position.y = activeArena.getHeightAt(winner.group.position.x, winner.group.position.z) + winner.heightOffset;
+  winner.distanceMovedThisTick = Math.hypot(
+    winner.group.position.x - previousX,
+    winner.group.position.y - previousY,
+    winner.group.position.z - previousZ,
+  );
+  updateSpinVisuals(winner, deltaTime);
+  sampleSpinnerTrail(winner, deltaTime);
+  updateSolidTrail(winner);
+
+  const critReady = isCritSpeedReady(winner);
+  winner.critReadyVfx.setActive(critReady);
+  winner.critReadyVfx.update(deltaTime, elapsedTime, camera, reducedMotionQuery.matches);
+  if (critReady) {
+    projectAuraGroundToArena(winner.critReadyVfx);
+  }
+  const ultimateActive = isUltimateActive(winner.ultimate);
+  winner.ultimateVfx.group.visible = ultimateActive;
+  if (ultimateActive) {
+    winner.ultimateVfx.update(deltaTime, elapsedTime);
+    projectAuraGroundToArena(winner.ultimateVfx);
+  }
+  for (const type of arenaBonusTypes) {
+    const aura = winner.bonusAuraVfxByType[type];
+    aura.group.visible = winner.bonusEffects.some((effect) => effect.type === type);
+    if (aura.group.visible) {
+      aura.update(deltaTime, elapsedTime);
+      projectAuraGroundToArena(aura);
+    }
+  }
+}
+
+function eliminateDeathmatchSpinner(spinner: SpinnerState): void {
+  const slotIndex = getDeathmatchParticipants().indexOf(spinner);
+  spinner.group.position.copy(deathmatchEliminationSlots[Math.max(0, slotIndex)]);
+  spinner.lifeState = "eliminated";
+  spinner.destructionTimer = 0;
+  setSpinnerRenderVisible(spinner, true);
   spinner.velocity.set(0, 0, 0);
   spinner.currentRPM = 0;
   spinner.maxRPM = 0;
@@ -2530,9 +3115,6 @@ function startDeathmatchRespawn(spinner: SpinnerState): void {
   spinner.collisionKnockbackMultiplier = 1;
   spinner.elementalMoveSpeedMultiplier = 1;
   spinner.elementalMovementLocked = false;
-  if (spinner === player) {
-    spinner.damageMultiplier = getUpgradeValue("damage", playerProfile.upgrades.damage);
-  }
   spinner.verticalLaunchActive = false;
   spinner.grounded = true;
   spinner.verticalVelocity = 0;
@@ -2558,97 +3140,18 @@ function startDeathmatchRespawn(spinner: SpinnerState): void {
   resetSpeedLimitRatio(spinner);
   if (spinner === player) {
     pointerHasWorldTarget = false;
-    savedCameraPosition.copy(camera.position);
-    savedCameraLookAt.copy(cameraLookAtTarget);
-    openDeathmatchOverlay(true);
-    deathCameraActive = true;
-    deathCameraReturning = false;
-  }
-}
-
-function startDeathmatchRespawnDash(spinner: SpinnerState): void {
-  const spawn = getDeathmatchSpawnPoint(spinner);
-  spinner.deathmatchStatus = "alive";
-  spinner.respawnTimer = 0;
-  spinner.invulnerabilityTimer = deathmatchSettings.invulnerabilityDuration;
-  startRespawnDash(spinner, projectToArenaSurface(spawn));
-  spinner.lastPosition.copy(spinner.group.position);
-  spinner.previousTrailPosition.copy(spinner.group.position);
-  spinner.velocity.set(0, 0, 0);
-  spinner.currentRPM = spinner.absoluteMaxRPM;
-  spinner.maxRPM = spinner.absoluteMaxRPM;
-  spinner.knockback.active = false;
-  spinner.dash.activeTimeRemaining = 0;
-  spinner.dash.cooldownRemaining = 0;
-  spinner.grounded = true;
-  spinner.verticalVelocity = 0;
-  spinner.heightOffset = 0;
-  spinner.distanceMovedThisTick = 0;
-  clearSpinnerTrail(spinner);
-  setSpinnerTarget(spinner, spinner.group.position, spinner.group.position);
-  spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.group.position));
-  spinner.botDesiredCursorPosition.copy(spinner.botVirtualCursorPosition);
-  spinner.followTargetPosition.copy(spinner.botVirtualCursorPosition);
-  resetSpeedLimitRatio(spinner);
-  botAiDirector.forget(spinner);
-  latestEnemyAiCommands.delete(spinner);
-  clearPairImpactTimes();
-  if (spinner === player) {
-    pointerHasWorldTarget = false;
     deathCameraActive = false;
     deathCameraReturning = true;
   }
 }
 
-function getPlayerDeathEdgeSpawnPoint(): THREE.Vector3 {
-  return projectToArenaSurface(new THREE.Vector3(0, 0, activeArena.radius));
-}
-
-function startRespawnDash(spinner: SpinnerState, destination: THREE.Vector3): void {
-  spinner.respawnDash.active = true;
-  spinner.respawnDash.fromPosition.copy(spinner.group.position);
-  spinner.respawnDash.toPosition.copy(destination);
-  spinner.respawnDash.elapsed = 0;
-  spinner.respawnDash.duration = respawnDashDuration;
-}
-
-function updateRespawnDashes(deltaTime: number): void {
-  for (const spinner of getDeathmatchParticipants()) {
-    const respawnDash = spinner.respawnDash;
-    if (!respawnDash.active) {
-      continue;
-    }
-
-    respawnDash.elapsed = Math.min(respawnDash.duration, respawnDash.elapsed + deltaTime);
-    const ratio = respawnDash.duration > 0 ? respawnDash.elapsed / respawnDash.duration : 1;
-    const eased = 1 - (1 - ratio) ** 3;
-    spinner.group.position.lerpVectors(respawnDash.fromPosition, respawnDash.toPosition, eased);
-    updateSpinnerVerticalState(spinner, deltaTime);
-    spinner.lastPosition.copy(spinner.group.position);
-    spinner.previousTrailPosition.copy(spinner.group.position);
-    spinner.velocity.set(0, 0, 0);
-    setSpinnerTarget(spinner, spinner.group.position, spinner.group.position);
-
-    if (ratio >= 1) {
-      respawnDash.active = false;
-      spinner.group.position.copy(respawnDash.toPosition);
-      setSpinnerTarget(spinner, spinner.group.position, spinner.group.position);
-      if (spinner !== player) {
-        spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.group.position));
-        spinner.botDesiredCursorPosition.copy(spinner.botVirtualCursorPosition);
-        spinner.followTargetPosition.copy(spinner.botVirtualCursorPosition);
-      }
-    }
+function prepareDeathmatchEliminationSlots(): void {
+  for (let index = 0; index < deathmatchEliminationSlots.length; index += 1) {
+    const angle = -Math.PI / 2 + index / deathmatchEliminationSlots.length * Math.PI * 2;
+    const slot = deathmatchEliminationSlots[index];
+    slot.set(Math.cos(angle), 0, Math.sin(angle));
+    slot.copy(getArenaEdgePoint(slot));
   }
-}
-
-function getDeathmatchSpawnPoint(spinner: SpinnerState): THREE.Vector3 {
-  if (spinner === player) {
-    return activeArena.playerStart;
-  }
-
-  const enemyIndex = Math.max(0, enemySpinners.indexOf(spinner));
-  return activeArena.enemySpawns[enemyIndex % activeArena.enemySpawns.length];
 }
 
 function clearSpinnerTrail(spinner: SpinnerState): void {
@@ -2675,7 +3178,7 @@ function applyUltimateChargeFromDamage(damageEvents: CombatDamageEvent<SpinnerSt
 function updateArenaBonusSystems(deltaTime: number): void {
   updateArenaBonuses(arenaBonusState, deltaTime);
   for (const spinner of combatSpinners) {
-    if (!isDeathmatchAlive(spinner)) {
+    if (!isSpinnerAlive(spinner)) {
       continue;
     }
     updateArenaBonusEffects(spinner, deltaTime);
@@ -2691,6 +3194,7 @@ function updateArenaBonusSystems(deltaTime: number): void {
   );
 
   for (const pickup of pickups) {
+    audioManager.playPickup(pickup.bonus.type === "heal");
     if (pickup.bonus.type === "heal") {
       createHealingZone(pickup.bonus.position);
       startHealAuraBurst(pickup.target.group);
@@ -3096,29 +3600,28 @@ function finishSpinnerFlash(spinner: SpinnerState): void {
   }
 }
 
-function updateDeathmatchProtectedVisuals(deltaTime: number): void {
+function updateDeathmatchEliminatedVisuals(): void {
   for (const spinner of getDeathmatchParticipants()) {
-    const protectedByDeathmatch = spinner.deathmatchStatus === "respawning" || spinner.invulnerabilityTimer > 0 || spinner.respawnDash.active;
-    if (!protectedByDeathmatch) {
-      finishDeathmatchProtectedVisual(spinner);
-      spinner.spinGroup.visible = true;
+    if (spinner.lifeState === "destroying") {
+      finishDeathmatchEliminatedVisual(spinner);
+      setSpinnerRenderVisible(spinner, false);
+      continue;
+    }
+    if (spinner.lifeState !== "eliminated") {
+      finishDeathmatchEliminatedVisual(spinner);
+      setSpinnerRenderVisible(spinner, true);
       continue;
     }
 
-    startDeathmatchProtectedVisual(spinner);
-    spinner.spinGroup.visible = true;
-    if (spinner.deathmatchVisual.material) {
-      const pulse = (Math.sin((elapsedTime + deltaTime) * Math.PI * 2 * deathmatchPulseFrequency) + 1) * 0.5;
-      spinner.deathmatchVisual.material.opacity = THREE.MathUtils.lerp(
-        deathmatchPulseMinOpacity,
-        deathmatchBlinkOpacity,
-        pulse,
-      );
+    startDeathmatchEliminatedVisual(spinner);
+    setSpinnerRenderVisible(spinner, true);
+    if (!usesInstancedEnemyModel(spinner)) {
+      spinner.deathmatchVisual.material.opacity = deathmatchEliminatedOpacity;
     }
   }
 }
 
-function startDeathmatchProtectedVisual(spinner: SpinnerState): void {
+function startDeathmatchEliminatedVisual(spinner: SpinnerState): void {
   const visual = spinner.deathmatchVisual;
   if (visual.active) {
     return;
@@ -3131,32 +3634,22 @@ function startDeathmatchProtectedVisual(spinner: SpinnerState): void {
     return;
   }
 
-  const material = new THREE.MeshBasicMaterial({
-    color: "#ffffff",
-    transparent: true,
-    opacity: deathmatchBlinkOpacity,
-    depthTest: true,
-  });
   const originalMaterials: FlashMaterialRecord[] = [];
 
   spinner.spinGroup.traverse((object) => {
     if (object instanceof THREE.Mesh && !isAnimeSpinnerOutline(object)) {
       originalMaterials.push({ mesh: object, material: object.material });
-      object.material = material;
+      object.material = visual.material;
     }
   });
 
-  if (originalMaterials.length === 0) {
-    material.dispose();
-    return;
-  }
+  if (originalMaterials.length === 0) return;
 
   visual.active = true;
-  visual.material = material;
   visual.originalMaterials = originalMaterials;
 }
 
-function finishDeathmatchProtectedVisual(spinner: SpinnerState): void {
+function finishDeathmatchEliminatedVisual(spinner: SpinnerState): void {
   const visual = spinner.deathmatchVisual;
   if (!visual.active) {
     return;
@@ -3165,11 +3658,10 @@ function finishDeathmatchProtectedVisual(spinner: SpinnerState): void {
   for (const record of visual.originalMaterials) {
     record.mesh.material = record.material;
   }
-  visual.material?.dispose();
   visual.active = false;
-  visual.material = null;
+  visual.material.opacity = deathmatchEliminatedOpacity;
   visual.originalMaterials = [];
-  spinner.spinGroup.visible = true;
+  spinner.spinGroup.visible = spinner.renderVisible;
   if (usesInstancedEnemyModel(spinner)) {
     spinner.modelTint = null;
   }
@@ -3177,6 +3669,11 @@ function finishDeathmatchProtectedVisual(spinner: SpinnerState): void {
 
 function usesInstancedEnemyModel(spinner: SpinnerState): boolean {
   return enemySpinners.includes(spinner) && spinner.spinGroup.children.length === 0;
+}
+
+function setSpinnerRenderVisible(spinner: SpinnerState, visible: boolean): void {
+  spinner.renderVisible = visible;
+  spinner.spinGroup.visible = visible;
 }
 
 function spawnDamageNumber(command: CombatDamageNumberCommand<SpinnerState>): void {
@@ -3210,7 +3707,7 @@ function spawnDamageNumber(command: CombatDamageNumberCommand<SpinnerState>): vo
 }
 
 function updatePlayer(deltaTime: number): void {
-  if (!isDeathmatchAlive(player) || player.respawnDash.active) {
+  if (!isSpinnerAlive(player)) {
     player.velocity.set(0, 0, 0);
     player.distanceMovedThisTick = 0;
     return;
@@ -3273,7 +3770,7 @@ function applyPlayerMobileTarget(): boolean {
 function updateEnemyAi(deltaTime: number): void {
   botAiDecisionElapsedTime += deltaTime;
   botAiDecisionCountdown -= deltaTime;
-  const aliveEnemies = enemySpinners.filter((spinner) => isDeathmatchAlive(spinner) && !spinner.respawnDash.active);
+  const aliveEnemies = enemySpinners.filter(isSpinnerAlive);
   if (botAiDecisionCountdown <= 0) {
     const commands = botAiDirector.update({
       bots: aliveEnemies,
@@ -3300,14 +3797,14 @@ function updateEnemyAi(deltaTime: number): void {
       spinner.targetPosition.copy(target);
       spinner.desiredTargetPosition.copy(target);
       spinner.visualTargetPosition.copy(projectToArenaSurface(command.visualTarget));
-      spinner.botDesiredCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, target));
+      spinner.botDesiredCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, target, botCursorProjected));
     }
     updateBotVirtualCursor(spinner, deltaTime);
     moveSpinnerTowardFollowTarget(spinner, deltaTime);
   }
 
   for (const spinner of enemySpinners) {
-    if (isDeathmatchAlive(spinner)) {
+    if (isSpinnerAlive(spinner)) {
       continue;
     }
     spinner.velocity.set(0, 0, 0);
@@ -3322,19 +3819,20 @@ function getNextBotAiDecisionDelay(): number {
 }
 
 function updateBotVirtualCursor(spinner: SpinnerState, deltaTime: number): void {
-  const desiredCursorPosition = projectPointOutsideBotCursorRadius(spinner, spinner.botDesiredCursorPosition);
-  const currentOffset = spinner.botVirtualCursorPosition.clone().sub(spinner.group.position);
-  const desiredOffset = desiredCursorPosition.clone().sub(spinner.group.position);
+  const desiredCursorPosition = projectPointOutsideBotCursorRadius(spinner, spinner.botDesiredCursorPosition, botCursorDesiredPosition);
+  const currentOffset = botCursorCurrentOffset.subVectors(spinner.botVirtualCursorPosition, spinner.group.position);
+  const desiredOffset = botCursorDesiredOffset.subVectors(desiredCursorPosition, spinner.group.position);
   currentOffset.y = 0;
   desiredOffset.y = 0;
 
-  const currentDirection = getSafeCursorDirection(currentOffset, spinner.forwardDirection);
-  const desiredDirection = getSafeCursorDirection(desiredOffset, currentDirection);
+  const currentDirection = getSafeCursorDirection(currentOffset, spinner.forwardDirection, botCursorCurrentDirection);
+  const desiredDirection = getSafeCursorDirection(desiredOffset, currentDirection, botCursorDesiredDirection);
   const preset = botDifficultyPresets[botDifficulty];
   const nextDirection = rotateDirectionToward(
     currentDirection,
     desiredDirection,
     preset.cursorAngularSpeed * deltaTime,
+    botCursorNextDirection,
   );
 
   const currentDistance = Math.max(currentOffset.length(), botCursorMinRadius);
@@ -3342,12 +3840,12 @@ function updateBotVirtualCursor(spinner: SpinnerState, deltaTime: number): void 
   const nextDistance = moveNumberToward(currentDistance, desiredDistance, preset.cursorRadialSpeed * deltaTime);
   spinner.botVirtualCursorPosition.copy(spinner.group.position).addScaledVector(nextDirection, nextDistance);
 
-  spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.botVirtualCursorPosition));
+  spinner.botVirtualCursorPosition.copy(projectPointOutsideBotCursorRadius(spinner, spinner.botVirtualCursorPosition, botCursorProjected));
   spinner.followTargetPosition.copy(spinner.botVirtualCursorPosition);
 }
 
-function getSafeCursorDirection(offset: THREE.Vector3, fallback: THREE.Vector3): THREE.Vector3 {
-  const direction = offset.clone();
+function getSafeCursorDirection(offset: THREE.Vector3, fallback: THREE.Vector3, direction: THREE.Vector3): THREE.Vector3 {
+  direction.copy(offset);
   direction.y = 0;
   if (direction.lengthSq() > 0.000001) {
     return direction.normalize();
@@ -3359,10 +3857,10 @@ function getSafeCursorDirection(offset: THREE.Vector3, fallback: THREE.Vector3):
     return direction.normalize();
   }
 
-  return new THREE.Vector3(1, 0, 0);
+  return direction.set(1, 0, 0);
 }
 
-function rotateDirectionToward(current: THREE.Vector3, desired: THREE.Vector3, maxAngle: number): THREE.Vector3 {
+function rotateDirectionToward(current: THREE.Vector3, desired: THREE.Vector3, maxAngle: number, result: THREE.Vector3): THREE.Vector3 {
   const currentAngle = Math.atan2(current.z, current.x);
   const desiredAngle = Math.atan2(desired.z, desired.x);
   let deltaAngle = desiredAngle - currentAngle;
@@ -3375,7 +3873,7 @@ function rotateDirectionToward(current: THREE.Vector3, desired: THREE.Vector3, m
 
   const clampedDelta = THREE.MathUtils.clamp(deltaAngle, -maxAngle, maxAngle);
   const nextAngle = currentAngle + clampedDelta;
-  return new THREE.Vector3(Math.cos(nextAngle), 0, Math.sin(nextAngle));
+  return result.set(Math.cos(nextAngle), 0, Math.sin(nextAngle));
 }
 
 function moveNumberToward(current: number, desired: number, maxDelta: number): number {
@@ -3385,14 +3883,14 @@ function moveNumberToward(current: number, desired: number, maxDelta: number): n
   return current + Math.sign(desired - current) * maxDelta;
 }
 
-function projectPointOutsideBotCursorRadius(spinner: SpinnerState, point: THREE.Vector3): THREE.Vector3 {
-  const projected = point.clone();
+function projectPointOutsideBotCursorRadius(spinner: SpinnerState, point: THREE.Vector3, projected: THREE.Vector3): THREE.Vector3 {
+  projected.copy(point);
   projected.y = 0;
-  const fromBot = projected.sub(spinner.group.position);
+  const fromBot = botCursorFromBot.subVectors(projected, spinner.group.position);
   fromBot.y = 0;
 
   if (fromBot.length() >= botCursorMinRadius) {
-    return projectToArenaSurface(point);
+    return projected.copy(projectToArenaSurface(point));
   }
 
   if (fromBot.lengthSq() <= 0.000001) {
@@ -3403,7 +3901,7 @@ function projectPointOutsideBotCursorRadius(spinner: SpinnerState, point: THREE.
     fromBot.set(1, 0, 0);
   }
 
-  return projectToArenaSurface(spinner.group.position.clone().addScaledVector(fromBot.normalize(), botCursorMinRadius));
+  return projected.copy(projectToArenaSurface(projected.copy(spinner.group.position).addScaledVector(fromBot.normalize(), botCursorMinRadius)));
 }
 
 function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number): void {
@@ -3427,7 +3925,7 @@ function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number)
     return;
   }
 
-  const beforeMove = spinner.group.position.clone();
+  const beforeMove = spinnerMoveStart.copy(spinner.group.position);
   const availableSpeed = getAvailableMoveSpeed(spinner);
   const dashSpeedMultiplier = getDashSpeedMultiplier(spinner.dash);
   const toTarget = scratchVector.subVectors(spinner.followTargetPosition, spinner.group.position);
@@ -3444,7 +3942,7 @@ function moveSpinnerTowardFollowTarget(spinner: SpinnerState, deltaTime: number)
   spinner.velocity.addScaledVector(acceleration, deltaTime);
 
   if (dashSpeedMultiplier > 1) {
-    const dashDirection = new THREE.Vector3(spinner.dash.direction.x, 0, spinner.dash.direction.z);
+    const dashDirection = spinnerDashDirection.set(spinner.dash.direction.x, 0, spinner.dash.direction.z);
     const dashSpeed = availableSpeed * dashSpeedMultiplier;
     const currentDashSpeed = spinner.velocity.dot(dashDirection);
     if (currentDashSpeed < dashSpeed) {
@@ -3544,7 +4042,8 @@ function updateForwardDirection(spinner: SpinnerState): void {
 }
 
 function updateSpinVisuals(spinner: SpinnerState, deltaTime: number): void {
-  const rpmVisualScale = spinner.absoluteMaxRPM > 0 ? spinner.currentRPM / spinner.absoluteMaxRPM : 0;
+  const rpmRatio = spinner.absoluteMaxRPM > 0 ? THREE.MathUtils.clamp(spinner.currentRPM / spinner.absoluteMaxRPM, 0, 1) : 0;
+  const rpmVisualScale = spinner.currentRPM > 0 ? Math.max(minSpinnerVisualRpmScale, rpmRatio) : 0;
   spinner.spinGroup.rotation.y += spinner.spinSpeed * rpmVisualScale * deltaTime;
 
   const motionScale = reducedMotionQuery.matches ? 0.45 : 1;
@@ -3685,7 +4184,38 @@ function handleResize(): void {
   camera.updateProjectionMatrix();
   renderer.setSize(viewport.width, viewport.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxRendererPixelRatio));
+  resizeCosmeticAuraDepthTarget();
   updateWorkshopStageLayout(viewport);
+  updateMainMenuStageLayout(viewport);
+  updateTimedRewardsLayout(viewport);
+}
+
+function resizeCosmeticAuraDepthTarget(): void {
+  renderer.getDrawingBufferSize(cosmeticAuraDepthResolution);
+  const width = Math.max(1, Math.round(cosmeticAuraDepthResolution.x));
+  const height = Math.max(1, Math.round(cosmeticAuraDepthResolution.y));
+  cosmeticAuraDepthTarget.setSize(width, height);
+  cosmeticAuraDepthResolution.set(width, height);
+  if (cosmeticAuraDepthTarget.depthTexture) {
+    player.critReadyVfx.setDepthContext?.(
+      cosmeticAuraDepthTarget.depthTexture,
+      cosmeticAuraDepthResolution,
+      camera.near,
+      camera.far,
+    );
+  }
+}
+
+function renderCosmeticAuraDepthPrepass(): void {
+  if (!player.critReadyVfx.isDepthEffectVisible?.()) return;
+  const wasVisible = player.critReadyVfx.group.visible;
+  const previousTarget = renderer.getRenderTarget();
+  player.critReadyVfx.group.visible = false;
+  renderer.setRenderTarget(cosmeticAuraDepthTarget);
+  renderer.clear(true, true, true);
+  renderer.render(scene, camera);
+  renderer.setRenderTarget(previousTarget);
+  player.critReadyVfx.group.visible = wasVisible;
 }
 
 function syncAppViewport() {
@@ -3697,4 +4227,14 @@ function syncAppViewport() {
 function updateWorkshopStageLayout(viewport = getAppViewport(window)): void {
   const stage = document.querySelector<HTMLElement>("[data-workshop-stage]");
   if (stage) applyWorkshopStageLayout(stage, viewport.width, viewport.height);
+}
+
+function updateMainMenuStageLayout(viewport = getAppViewport(window)): void {
+  const stage = document.querySelector<HTMLElement>("[data-menu-stage]");
+  if (stage) applyMainMenuStageLayout(stage, viewport.width, viewport.height);
+}
+
+function updateTimedRewardsLayout(viewport = getAppViewport(window)): void {
+  timedRewardsUi.resize(viewport.width, viewport.height);
+  finalImpactOverlay.resize();
 }

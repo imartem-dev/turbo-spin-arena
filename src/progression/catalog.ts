@@ -1,6 +1,7 @@
-export type CatalogCategory = "model" | "color" | "trail" | "aura";
+export type CatalogCategory = "element" | "model" | "color" | "trail" | "aura";
 export type PaymentOption = { kind: "parts"; amount: number } | { kind: "yan"; productId: string };
 export type CatalogPreviewKind = "model" | "aura";
+export type AuraStyleId = "aura_1" | "aura_2" | "aura_3";
 export type CatalogItem = {
   id: string;
   category: CatalogCategory;
@@ -12,11 +13,18 @@ export type CatalogItem = {
   paymentOptions: PaymentOption[];
 };
 
+export const elementCatalog: CatalogItem[] = [
+  { id: "element_fire", category: "element", labelKey: "element.fire", paymentOptions: [] },
+  { id: "element_ice", category: "element", labelKey: "element.ice", paymentOptions: [{ kind: "parts", amount: 800 }] },
+  { id: "element_lightning", category: "element", labelKey: "element.lightning", paymentOptions: [{ kind: "parts", amount: 1600 }] },
+  { id: "element_earth", category: "element", labelKey: "element.earth", paymentOptions: [{ kind: "parts", amount: 2800 }] },
+];
+
 export const modelCatalog: CatalogItem[] = [
   { id: "model_default", category: "model", labelKey: "catalog.model.default", assetKey: "spinner2", previewKind: "model", available: true, paymentOptions: [] },
-  { id: "model_street", category: "model", labelKey: "catalog.model.street", assetKey: "spinner33", previewKind: "model", available: true, paymentOptions: [{ kind: "parts", amount: 1000 }, { kind: "yan", productId: "model_street" }] },
-  { id: "model_turbo", category: "model", labelKey: "catalog.model.turbo", assetKey: "spinner44", previewKind: "model", available: true, paymentOptions: [{ kind: "parts", amount: 2500 }, { kind: "yan", productId: "model_turbo" }] },
-  { id: "model_legend", category: "model", labelKey: "catalog.model.legend", assetKey: "spinner5", previewKind: "model", available: true, paymentOptions: [{ kind: "parts", amount: 5000 }, { kind: "yan", productId: "model_legend" }] },
+  { id: "model_street", category: "model", labelKey: "catalog.model.street", assetKey: "spinner33", previewKind: "model", available: true, paymentOptions: [{ kind: "parts", amount: 3500 }] },
+  { id: "model_turbo", category: "model", labelKey: "catalog.model.turbo", assetKey: "spinner44", previewKind: "model", available: true, paymentOptions: [{ kind: "parts", amount: 6000 }] },
+  { id: "model_legend", category: "model", labelKey: "catalog.model.legend", assetKey: "spinner5", previewKind: "model", available: true, paymentOptions: [{ kind: "yan", productId: "model_legend" }] },
 ];
 
 type ColorDefinition = { name: string; hex: string; labelKey: string };
@@ -24,18 +32,18 @@ type ColorDefinition = { name: string; hex: string; labelKey: string };
 export const baseColors: ColorDefinition[] = [
   { name: "white", hex: "#FFFFFF", labelKey: "catalog.color.white" },
   { name: "black", hex: "#000000", labelKey: "catalog.color.black" },
-  { name: "gray", hex: "#808080", labelKey: "catalog.color.gray" },
-  { name: "navy", hex: "#0B1F3A", labelKey: "catalog.color.navy" },
-  { name: "dark_green", hex: "#0B3D2E", labelKey: "catalog.color.darkGreen" },
-  { name: "burgundy", hex: "#800020", labelKey: "catalog.color.burgundy" },
-];
-
-export const brightColors: ColorDefinition[] = [
-  { name: "red", hex: "#FF0000", labelKey: "catalog.color.red" },
-  { name: "orange", hex: "#FF7A00", labelKey: "catalog.color.orange" },
   { name: "yellow", hex: "#FFD700", labelKey: "catalog.color.yellow" },
   { name: "blue", hex: "#3F00FF", labelKey: "catalog.color.blue" },
   { name: "green", hex: "#00C853", labelKey: "catalog.color.green" },
+  { name: "red", hex: "#FF0000", labelKey: "catalog.color.red" },
+];
+
+export const brightColors: ColorDefinition[] = [
+  { name: "silver", hex: "#C9CED8", labelKey: "catalog.color.silver" },
+  { name: "orange", hex: "#FF7A00", labelKey: "catalog.color.orange" },
+  { name: "bronze", hex: "#B56A36", labelKey: "catalog.color.bronze" },
+  { name: "sand", hex: "#E7C78B", labelKey: "catalog.color.sand" },
+  { name: "azure", hex: "#168CFF", labelKey: "catalog.color.azure" },
   { name: "violet", hex: "#8A2BE2", labelKey: "catalog.color.violet" },
 ];
 
@@ -48,18 +56,11 @@ export const unusualColors: ColorDefinition[] = [
   { name: "raspberry", hex: "#E30B5C", labelKey: "catalog.color.raspberry" },
 ];
 
-const allColors = [...baseColors, ...brightColors, ...unusualColors];
+export const allColors = [...baseColors, ...brightColors, ...unusualColors];
 
-function colorPayments(name: string, partsPrice: number): PaymentOption[] {
+function colorPayments(name: string): PaymentOption[] {
   if (baseColors.some((entry) => entry.name === name)) return [];
-  if (brightColors.some((entry) => entry.name === name)) return [{ kind: "parts", amount: partsPrice }];
-  return [{ kind: "yan", productId: `material_color_${name}` }];
-}
-
-function trailPayments(name: string): PaymentOption[] {
-  if (baseColors.some((entry) => entry.name === name)) return [];
-  if (brightColors.some((entry) => entry.name === name)) return [{ kind: "parts", amount: 500 }];
-  return [{ kind: "yan", productId: `trail_color_${name}` }];
+  return [{ kind: "parts", amount: 500 }];
 }
 
 export const colorCatalog: CatalogItem[] = allColors.map(({ name, hex, labelKey }) => ({
@@ -67,7 +68,7 @@ export const colorCatalog: CatalogItem[] = allColors.map(({ name, hex, labelKey 
   category: "color",
   labelKey,
   color: hex,
-  paymentOptions: colorPayments(name, 250),
+  paymentOptions: colorPayments(name),
 }));
 
 export const trailCatalog: CatalogItem[] = allColors.map(({ name, hex, labelKey }) => ({
@@ -75,15 +76,17 @@ export const trailCatalog: CatalogItem[] = allColors.map(({ name, hex, labelKey 
   category: "trail",
   labelKey,
   color: hex,
-  paymentOptions: trailPayments(name),
+  paymentOptions: [],
 }));
 
 export const auraCatalog: CatalogItem[] = [
-  { id: "aura_crit", category: "aura", labelKey: "catalog.aura.crit", previewKind: "aura", paymentOptions: [] },
-  { id: "aura_green", category: "aura", labelKey: "catalog.aura.green", previewKind: "aura", paymentOptions: [{ kind: "parts", amount: 1000 }] },
-  { id: "aura_pink", category: "aura", labelKey: "catalog.aura.pink", previewKind: "aura", paymentOptions: [{ kind: "parts", amount: 1000 }] },
-  { id: "aura_red", category: "aura", labelKey: "catalog.aura.red", previewKind: "aura", paymentOptions: [{ kind: "parts", amount: 1000 }] },
-  { id: "aura_yellow", category: "aura", labelKey: "catalog.aura.yellow", previewKind: "aura", paymentOptions: [{ kind: "parts", amount: 1000 }] },
+  { id: "aura_1", category: "aura", labelKey: "catalog.aura.one", previewKind: "aura", paymentOptions: [] },
+  { id: "aura_2", category: "aura", labelKey: "catalog.aura.two", previewKind: "aura", paymentOptions: [{ kind: "parts", amount: 3000 }] },
+  { id: "aura_3", category: "aura", labelKey: "catalog.aura.three", previewKind: "aura", paymentOptions: [{ kind: "yan", productId: "aura_3" }] },
 ];
+
+export function isAuraStyleId(value: string): value is AuraStyleId {
+  return value === "aura_1" || value === "aura_2" || value === "aura_3";
+}
 
 export const cosmeticCatalog = [...modelCatalog, ...colorCatalog, ...trailCatalog, ...auraCatalog];

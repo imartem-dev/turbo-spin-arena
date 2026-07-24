@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeThumbnailCameraDistance } from "./workshopTilePreviewRenderer";
+import {
+  auraThumbnailPresentation,
+  computeThumbnailCameraDistance,
+  getAuraThumbnailScale,
+} from "./workshopTilePreviewRenderer";
 
 describe("workshop model thumbnail camera", () => {
   it("moves farther away for wider and taller model bounds", () => {
@@ -13,5 +17,15 @@ describe("workshop model thumbnail camera", () => {
     expect(computeThumbnailCameraDistance(size, 0.9)).toBeGreaterThan(
       computeThumbnailCameraDistance(size, 2.2),
     );
+  });
+
+  it("uses a fixed white frame and only reduces the second aura", () => {
+    expect(auraThumbnailPresentation).toMatchObject({
+      color: "#ffffff",
+      deltaTime: 0,
+      elapsedTime: 0.85,
+    });
+    expect(getAuraThumbnailScale("aura_2")).toBeLessThan(getAuraThumbnailScale("aura_1"));
+    expect(getAuraThumbnailScale("aura_3")).toBe(getAuraThumbnailScale("aura_1"));
   });
 });

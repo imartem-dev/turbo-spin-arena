@@ -6,6 +6,7 @@ export type SpinnerModelAssetKey = "spinner2" | "spinner33" | "spinner44" | "spi
 export type SpinnerModelAsset = {
   key: SpinnerModelAssetKey;
   url: string;
+  destructionUrl: string;
   rotationX: number;
   outline: boolean;
 };
@@ -16,24 +17,28 @@ export const spinnerModelAssets: Record<SpinnerModelAssetKey, SpinnerModelAsset>
   spinner2: {
     key: "spinner2",
     url: `${baseUrl}assets/models/spiner2.glb`,
+    destructionUrl: `${baseUrl}assets/models/spiner2_destroy.glb`,
     rotationX: -Math.PI / 2,
     outline: true,
   },
   spinner33: {
     key: "spinner33",
     url: `${baseUrl}assets/models/spiner33.glb`,
+    destructionUrl: `${baseUrl}assets/models/spiner2_destroy.glb`,
     rotationX: -Math.PI / 2,
     outline: true,
   },
   spinner44: {
     key: "spinner44",
     url: `${baseUrl}assets/models/spiner44.glb`,
+    destructionUrl: `${baseUrl}assets/models/spiner2_destroy.glb`,
     rotationX: -Math.PI / 2,
     outline: true,
   },
   spinner5: {
     key: "spinner5",
     url: `${baseUrl}assets/models/spiner5.glb`,
+    destructionUrl: `${baseUrl}assets/models/spiner2_destroy.glb`,
     rotationX: -Math.PI / 2,
     outline: true,
   },
@@ -46,6 +51,7 @@ export type LoadedSpinnerModel = {
 
 export class SpinnerModelLoader {
   private readonly cache = new Map<SpinnerModelAssetKey, Promise<LoadedSpinnerModel>>();
+  private readonly destructionCache = new Map<string, Promise<THREE.Group>>();
   private readonly gltfLoader = new GLTFLoader();
 
   load(assetKey: SpinnerModelAssetKey): Promise<LoadedSpinnerModel> {
@@ -56,6 +62,16 @@ export class SpinnerModelLoader {
     const request = this.gltfLoader.loadAsync(asset.url).then((gltf) => ({ asset, source: gltf.scene }));
     this.cache.set(assetKey, request);
     request.catch(() => this.cache.delete(assetKey));
+    return request;
+  }
+
+  loadDestruction(assetKey: SpinnerModelAssetKey): Promise<THREE.Group> {
+    const url = spinnerModelAssets[assetKey].destructionUrl;
+    const cached = this.destructionCache.get(url);
+    if (cached) return cached;
+    const request = this.gltfLoader.loadAsync(url).then((gltf) => gltf.scene);
+    this.destructionCache.set(url, request);
+    request.catch(() => this.destructionCache.delete(url));
     return request;
   }
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
-    <title>Spin To Win MVP</title>
+    <title>Spinner Battle</title>
     <style>
       @font-face {
         font-family: "ZeroCool";
@@ -18,6 +18,9 @@
         height: 100%;
         margin: 0;
         overflow: hidden;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
         background: #101612;
         color: #eef7ee;
         font-family:
@@ -388,156 +391,6 @@
         user-select: none;
       }
 
-      .deathmatch-scoreboard-button {
-        position: fixed;
-        top: 16px;
-        right: 10px;
-        z-index: 9;
-        width: min(300px, calc(100vw - 20px));
-        min-height: 58px;
-        padding: 12px 28px;
-        border: 0;
-        background: linear-gradient(105deg, rgba(75, 132, 178, 0.92), rgba(98, 164, 210, 0.86) 78%, rgba(255, 255, 255, 0) 78%);
-        color: #ffffff;
-        font-family: "ZeroCool", Impact, "Arial Black", sans-serif;
-        font-size: clamp(24px, 2.6vw, 36px);
-        line-height: 1;
-        letter-spacing: 0;
-        text-align: left;
-        text-transform: uppercase;
-        transform: skewX(-9deg);
-        cursor: pointer;
-        filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.28)) drop-shadow(0 16px 20px rgba(0, 0, 0, 0.3));
-        user-select: none;
-      }
-
-      .deathmatch-scoreboard-button span {
-        display: inline-block;
-        transform: skewX(9deg);
-      }
-
-      .deathmatch-scoreboard-button.active {
-        outline: 2px solid rgba(255, 255, 255, 0.8);
-      }
-
-      body:not(.match-started) .deathmatch-scoreboard-button {
-        display: none;
-      }
-
-      .deathmatch-overlay {
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        z-index: 8;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-        width: 80vw;
-        height: 80vh;
-        padding: clamp(18px, 3vw, 34px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 7px;
-        background: rgba(7, 11, 9, 0.85);
-        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.48);
-        color: rgba(238, 247, 238, 0.92);
-        transform: translate(-50%, -50%);
-        user-select: none;
-      }
-
-      .deathmatch-overlay[hidden],
-      body:not(.match-started) .deathmatch-overlay {
-        display: none;
-      }
-
-      .deathmatch-leaderboard {
-        min-height: 0;
-        overflow: auto;
-      }
-
-      .deathmatch-leaderboard-title {
-        margin-bottom: 18px;
-        color: #ffffff;
-        font-family: "ZeroCool", Impact, "Arial Black", sans-serif;
-        font-size: clamp(36px, 6vw, 76px);
-        line-height: 0.9;
-        text-transform: uppercase;
-      }
-
-      .deathmatch-leaderboard-table {
-        width: 100%;
-        border-collapse: collapse;
-        font: 800 clamp(16px, 2.2vw, 30px)/1.2 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .deathmatch-leaderboard-table th,
-      .deathmatch-leaderboard-table td {
-        padding: 8px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        text-align: right;
-        white-space: nowrap;
-      }
-
-      .deathmatch-leaderboard-table th {
-        color: rgba(255, 255, 255, 0.58);
-        font-size: 0.72em;
-        text-transform: uppercase;
-      }
-
-      .deathmatch-leaderboard-table th:nth-child(2),
-      .deathmatch-leaderboard-table td:nth-child(2) {
-        text-align: left;
-      }
-
-      .deathmatch-leaderboard-table tr.player td {
-        color: #8bd3ff;
-      }
-
-      .deathmatch-leaderboard-table tr.respawning td,
-      .deathmatch-leaderboard-table tr.invulnerable td {
-        color: #ffffff;
-      }
-
-      .deathmatch-continue {
-        align-self: flex-start;
-        width: min(470px, 88vw);
-        min-height: 58px;
-        margin-top: auto;
-        padding: 12px 34px;
-        border: 0;
-        background: linear-gradient(105deg, rgba(74, 77, 88, 0.9), rgba(93, 96, 109, 0.82) 78%, rgba(255, 255, 255, 0) 78%);
-        color: #ffffff;
-        font-family: "ZeroCool", Impact, "Arial Black", sans-serif;
-        font-size: clamp(24px, 3vw, 42px);
-        line-height: 1;
-        letter-spacing: 0;
-        text-align: left;
-        text-transform: uppercase;
-        transform: skewX(-9deg);
-        pointer-events: auto;
-        cursor: default;
-        filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.28)) drop-shadow(0 16px 20px rgba(0, 0, 0, 0.3));
-      }
-
-      .deathmatch-continue span {
-        display: inline-block;
-        transform: skewX(9deg);
-      }
-
-      .deathmatch-continue:disabled {
-        opacity: 0.72;
-        cursor: default;
-      }
-
-      .deathmatch-continue.ready {
-        background: linear-gradient(105deg, #d3a421, #f2ce48 72%, rgba(255, 255, 255, 0) 72%);
-        cursor: pointer;
-      }
-
-      .deathmatch-continue[hidden] {
-        display: none;
-      }
-
       .rpm-hud {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 42px);
@@ -708,11 +561,6 @@
 
       .rpm-card.enemy .rpm-fill {
         background: #34d15f;
-      }
-
-      .rpm-card.respawning,
-      .rpm-card.invulnerable {
-        border-color: rgba(255, 255, 255, 0.34);
       }
 
       .bonus-icons {
@@ -914,16 +762,6 @@
       }
 
       @media (max-width: 640px) {
-        .deathmatch-scoreboard-button {
-          top: 40px;
-          width: min(260px, calc(100vw - 20px));
-        }
-
-        .deathmatch-overlay {
-          width: 88vw;
-          height: 82vh;
-        }
-
         .main-menu {
           grid-template-columns: 1fr;
           align-content: start;
@@ -1063,14 +901,6 @@
           width: clamp(64px, 17vh, 112px);
         }
 
-        .deathmatch-scoreboard-button {
-          top: 10px;
-          width: min(240px, calc(100vw - 20px));
-          min-height: 42px;
-          padding: 9px 22px;
-          font-size: 22px;
-        }
-
         .rpm-hud {
           width: min(210px, calc(50vw - 24px));
         }
@@ -1184,13 +1014,6 @@
       .result-title { margin: 0 0 16px; font-size: clamp(42px, 7vw, 78px); }
       .result-stats { display: grid; gap: 8px; margin: 18px 0; font-size: 22px; }
       .result-actions { display: grid; gap: 9px; }
-      .match-timer {
-        position: fixed; top: 10px; left: 50%; z-index: 4; transform: translateX(-50%);
-        padding: 7px 18px; border-radius: 6px; background: rgba(7, 12, 10, .76); color: #fff;
-        font: 24px "ZeroCool", Impact, sans-serif; box-shadow: 0 6px 18px #0007;
-      }
-      .match-timer[hidden] { display: none; }
-
       @media (max-height: 800px) and (min-width: 641px) {
         .main-menu { padding: 24px 5vw; overflow-y: auto; }
         .menu-left { gap: 9px; }
@@ -1219,79 +1042,47 @@
         <strong data-i18n="orientation.rotate">Rotate your device</strong>
       </div>
     </div>
-    <div class="global-currency" data-global-currency data-i18n-aria="parts.name" aria-label="Parts">
-      <span class="currency-emblem" aria-hidden="true">
-        <img class="parts-icon" src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />
-      </span>
-      <span class="currency-value" data-parts-balance>0</span>
-      <button class="currency-add" data-menu-placeholder type="button" data-i18n-aria="menu.addCurrency">+</button>
-    </div>
     <section class="main-menu" data-start-menu>
-      <div class="menu-stage">
-        <h1 class="visually-hidden" data-i18n="game.title">Turbo Spin Arena</h1>
+      <div class="menu-stage" data-menu-stage>
+        <div class="menu-currency atlas-sprite atlas-bottom-white" data-i18n-aria="parts.name" aria-label="Parts">
+          <img class="parts-icon" src="/assets/ui/shared/icon-currency.webp" alt="" aria-hidden="true" />
+          <span class="currency-value" data-parts-balance>0</span>
+        </div>
 
         <div class="menu-tools" data-i18n-aria="menu.controls" aria-label="Menu controls">
-          <button class="menu-square-button" data-menu-settings type="button" data-i18n-aria="menu.settings">
-            <img src="/assets/ui/main-menu/icons/settings.webp" alt="" />
+          <button class="menu-square-button atlas-sprite atlas-square menu-language-button" data-menu-language type="button" aria-expanded="false" aria-controls="language-dialog" aria-label="Language">
+            <span class="language-code" data-language-code>RU</span>
           </button>
-          <button class="menu-square-button" data-menu-sound type="button" aria-pressed="true" data-i18n-aria="menu.sound">
-            <img class="sound-on-icon" src="/assets/ui/main-menu/icons/sound-on.webp" alt="" />
-            <img class="sound-off-icon" src="/assets/ui/main-menu/icons/sound-off.webp" alt="" />
+          <button class="menu-square-button atlas-sprite atlas-square" data-menu-sound type="button" aria-pressed="true" data-i18n-aria="menu.sound">
+            <span class="ui-atlas-icon icon-sound sound-on-icon" aria-hidden="true"></span>
+            <span class="ui-atlas-icon icon-sound-off sound-off-icon" aria-hidden="true"></span>
           </button>
         </div>
 
         <div class="menu-mode-area">
           <div class="mode-track" data-mode-track>
-            <button class="mode-card active" data-game-mode="duel" type="button" aria-pressed="true">
+            <button class="mode-card atlas-sprite atlas-mode active" data-game-mode="duel" type="button" aria-pressed="true">
               <span class="mode-card-title" data-i18n="mode.duel">1v1</span>
               <img class="mode-card-art duel-art" src="/assets/ui/main-menu/mode-duel.webp" alt="" />
-              <span class="mode-selected-label" data-i18n="menu.selected">Selected</span>
             </button>
-            <button class="mode-card" data-game-mode="deathmatch" type="button" aria-pressed="false">
+            <button class="mode-card atlas-sprite atlas-mode" data-game-mode="deathmatch" type="button" aria-pressed="false">
               <span class="mode-card-title" data-i18n="mode.deathmatch">Deathmatch</span>
               <img class="mode-card-art" src="/assets/ui/main-menu/mode-deathmatch.webp" alt="" />
-              <span class="mode-selected-label" data-i18n="menu.selected">Selected</span>
-            </button>
-            <button class="mode-card unavailable" type="button" disabled>
-              <span class="mode-card-title" data-i18n="mode.survival">Survival</span>
-              <img class="mode-card-art" src="/assets/ui/main-menu/mode-survival.webp" alt="" />
-              <small class="soon-badge" data-i18n="mode.unavailable">Soon</small>
             </button>
           </div>
         </div>
 
-        <button class="menu-play-button" type="button" data-start-match>
-          <img class="play-spin-icon" src="/assets/ui/main-menu/icons/play-spin.webp" alt="" />
+        <button class="menu-play-button atlas-sprite atlas-primary" type="button" data-start-match>
           <span data-i18n="menu.play">Play</span>
         </button>
 
         <aside class="menu-side-column">
-          <section class="menu-cut-panel daily-panel">
-            <h2 data-i18n="menu.dailyTasks">Daily missions</h2>
-            <div class="daily-task">
-              <span class="task-icon" aria-hidden="true"><img src="/assets/ui/main-menu/icons/quest-play.webp" alt="" /></span>
-              <span class="task-copy"><strong data-i18n="menu.taskPlay">Play 3 battles</strong><span><b>1/3</b><i style="--progress: 33%"></i></span></span>
-              <span class="task-reward"><img src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />100</span>
-            </div>
-            <div class="daily-task">
-              <span class="task-icon" aria-hidden="true"><img src="/assets/ui/main-menu/icons/quest-win.webp" alt="" /></span>
-              <span class="task-copy"><strong data-i18n="menu.taskWin">Win 2 battles</strong><span><b>0/2</b><i style="--progress: 0%"></i></span></span>
-              <span class="task-reward"><img src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />150</span>
-            </div>
-            <div class="daily-task">
-              <span class="task-icon" aria-hidden="true"><img src="/assets/ui/main-menu/icons/quest-damage.webp" alt="" /></span>
-              <span class="task-copy"><strong data-i18n="menu.taskDamage">Deal 5000 damage</strong><span><b>1200/5000</b><i style="--progress: 24%"></i></span></span>
-              <span class="task-reward"><img src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />200</span>
-            </div>
-          </section>
-
-          <button class="menu-cut-panel free-chest-panel" data-free-chest type="button" data-i18n-aria="menu.openChest">
+          <button class="free-chest-panel atlas-sprite atlas-mode" data-free-chest type="button" data-i18n-aria="menu.openChest">
             <div class="free-chest-copy">
-              <h2 data-i18n="menu.freeChest">Free chest</h2>
               <span class="free-chest-ready" data-free-chest-ready data-i18n="menu.openChest">Open</span>
               <time data-free-chest-timer datetime="PT0S" hidden>00:00:00</time>
               <span class="free-chest-reward" data-free-chest-reward aria-live="polite">
-                <img src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />
+                <img src="/assets/ui/shared/icon-currency.webp" alt="" />
                 <b>+100</b>
               </span>
             </div>
@@ -1309,32 +1100,17 @@
         </aside>
 
         <nav class="menu-utility-nav" data-i18n-aria="menu.sections" aria-label="Main sections">
-          <button class="menu-utility-button" data-menu-placeholder type="button">
-            <img src="/assets/ui/main-menu/icons/shop.webp" alt="" />
-            <span data-i18n="menu.shop">Shop</span>
-          </button>
-          <button class="menu-utility-button" data-open-workshop type="button">
-            <img src="/assets/ui/main-menu/icons/workshop.webp" alt="" />
+          <button class="menu-utility-button atlas-sprite atlas-secondary" data-open-workshop type="button">
             <span data-i18n="menu.workshop">Workshop</span>
           </button>
-          <button class="menu-utility-button" data-menu-placeholder type="button">
-            <img src="/assets/ui/main-menu/icons/achievements.webp" alt="" />
-            <span data-i18n="menu.achievements">Achievements</span>
-          </button>
-          <button class="menu-utility-button" data-menu-placeholder type="button">
-            <img src="/assets/ui/main-menu/icons/news.webp" alt="" />
-            <span data-i18n="menu.news">News</span>
+          <button class="menu-utility-button atlas-sprite atlas-secondary" data-auth-open type="button" hidden>
+            <span data-i18n="auth.open">Sign in for cloud saves</span>
           </button>
         </nav>
       </div>
       <details class="dev-controls" data-dev-controls hidden>
         <summary data-i18n="dev.settings">Development settings</summary>
         <div class="dev-controls-body">
-          <label class="menu-setting-row">
-            <span data-i18n="settings.spinnerSize">Size</span>
-            <input data-spinner-size type="range" min="0.6" max="3" step="0.05" value="1" />
-            <output data-spinner-size-value>1.00</output>
-          </label>
           <div class="menu-difficulty-row">
             <span data-i18n="settings.botLevel">Bot level</span>
             <div class="menu-difficulty-buttons">
@@ -1346,52 +1122,99 @@
         </div>
       </details>
     </section>
+    <div class="auth-dialog" data-auth-dialog role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+      <div class="auth-card">
+        <h2 id="auth-title" data-i18n="auth.title">Save progress in the cloud?</h2>
+        <p data-i18n="auth.benefit">Signing in makes progress available on your other devices. You can keep playing as a guest.</p>
+        <div class="auth-actions">
+          <button class="ui-button atlas-sprite atlas-primary primary" data-auth-confirm type="button" data-i18n="auth.confirm">Sign in</button>
+          <button class="ui-button atlas-sprite atlas-secondary secondary" data-auth-cancel type="button" data-i18n="auth.cancel">Continue as guest</button>
+        </div>
+      </div>
+    </div>
+    <div class="timed-rewards-dialog" data-timed-rewards-dialog role="dialog" aria-modal="true" aria-labelledby="timed-rewards-title" hidden>
+      <section class="timed-rewards-window atlas-sprite atlas-window">
+        <h2 id="timed-rewards-title" data-i18n="rewards.title">Timed chests</h2>
+        <button class="timed-rewards-close atlas-sprite atlas-square" data-timed-rewards-close type="button" data-i18n-aria="rewards.close">
+          <span class="ui-atlas-icon icon-close" aria-hidden="true"></span>
+        </button>
+        <div class="timed-rewards-grid" data-timed-rewards-grid></div>
+        <div class="timed-reward-reveal" data-timed-reward-reveal hidden>
+          <h3 data-i18n="rewards.received">Reward received</h3>
+          <div class="timed-reward-items" data-timed-reward-items></div>
+          <button class="atlas-sprite atlas-primary" data-timed-reward-continue type="button" data-i18n="rewards.continue">Continue</button>
+        </div>
+      </section>
+    </div>
+    <div class="timed-rewards-dialog language-dialog" id="language-dialog" data-language-dialog role="dialog" aria-modal="true" aria-label="Language selection" hidden>
+      <section class="timed-rewards-window atlas-sprite atlas-window language-window">
+        <button class="timed-rewards-close atlas-sprite atlas-square" data-language-close type="button" aria-label="Close">
+          <span class="ui-atlas-icon icon-close" aria-hidden="true"></span>
+        </button>
+        <div class="language-dialog-grid" data-language-menu role="menu"></div>
+      </section>
+    </div>
     <section class="game-screen workshop-screen" data-workshop hidden>
       <div class="workshop-stage" data-workshop-stage>
         <header class="workshop-header">
-          <button class="workshop-back" data-close-workshop type="button" data-i18n-aria="common.back">
-            <img src="/assets/ui/workshop/icons/back.webp" alt="" />
+          <button class="workshop-back atlas-sprite atlas-secondary" data-close-workshop type="button" data-i18n-aria="result.menu">
+            <span class="ui-atlas-icon icon-home" aria-hidden="true"></span>
+            <span data-i18n="result.menu">Main menu</span>
           </button>
           <h2 class="workshop-title" data-i18n="workshop.title">Workshop</h2>
-          <div class="workshop-currency" data-i18n-aria="parts.name" aria-label="Parts">
-            <span class="currency-emblem" aria-hidden="true">
-              <img class="parts-icon" src="/assets/ui/main-menu/icons/parts-token.webp" alt="" />
-            </span>
+          <div class="workshop-currency atlas-sprite atlas-bottom-white" data-i18n-aria="parts.name" aria-label="Parts">
+            <img class="parts-icon" src="/assets/ui/shared/icon-currency.webp" alt="" aria-hidden="true" />
             <span class="currency-value" data-parts-balance>0</span>
           </div>
-          <button class="workshop-currency-add" data-menu-placeholder type="button" tabindex="-1" data-i18n-aria="menu.addCurrency">+</button>
         </header>
         <div class="workshop-preview-panel" data-workshop-preview>
           <div class="preview-drag-surface" data-preview-drag data-i18n-aria="workshop.rotate" aria-label="Rotate spinner"></div>
         </div>
         <div class="workshop-tabs">
-          <button class="workshop-tab active" data-workshop-tab="style" type="button" data-i18n="workshop.appearance">Appearance</button>
-          <button class="workshop-tab" data-workshop-tab="tuning" type="button" data-i18n="workshop.upgrades">Upgrades</button>
+          <button class="workshop-tab atlas-sprite atlas-tab active" data-workshop-tab="style" type="button" data-i18n="workshop.appearance">Appearance</button>
+          <button class="workshop-tab atlas-sprite atlas-tab" data-workshop-tab="tuning" type="button" data-i18n="workshop.upgrades">Upgrades</button>
+          <button class="workshop-tab atlas-sprite atlas-tab" data-workshop-tab="shop" type="button" data-i18n="menu.shop">Shop</button>
         </div>
         <div class="workshop-panel">
           <div class="workshop-content" data-workshop-content></div>
         </div>
-        <button class="workshop-play" data-workshop-play type="button" data-i18n="menu.play">Play</button>
+        <button class="workshop-play atlas-sprite atlas-primary" data-workshop-play type="button" data-i18n="menu.play">Play</button>
       </div>
     </section>
     <section class="game-screen result-screen" data-result-screen hidden>
-      <div class="result-card">
-        <h2 class="result-title" data-result-title>Victory</h2>
+      <div class="result-card" data-result-card data-result-theme="victory">
+        <h2 class="result-title" id="result-title" data-result-title>Victory</h2>
         <div class="result-stats" data-result-stats></div>
         <div class="result-reward">
-          <svg class="parts-icon" viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M13 2h6l1.2 4.1 3.7-2 4.2 4.2-2 3.7L30 13v6l-3.9 1 2 3.7-4.2 4.2-3.7-2L19 30h-6l-1.2-4.1-3.7 2-4.2-4.2 2-3.7L2 19v-6l3.9-1-2-3.7 4.2-4.2 3.7 2L13 2Zm3 8a6 6 0 1 0 0 12 6 6 0 0 0 0-12Zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
-          <span class="result-reward-value" data-result-reward>+0</span>
-          <span class="result-reward-label" data-i18n="result.earned">Parts earned</span>
+          <span class="result-chest" aria-hidden="true"></span>
+          <div class="result-reward-strip">
+            <img class="parts-icon" src="/assets/ui/shared/icon-currency.webp" alt="" aria-hidden="true" />
+            <span class="result-reward-label" data-i18n="result.earned">Reward</span>
+            <span class="result-reward-copy">
+              <span class="result-reward-value" data-result-reward>+0</span>
+            </span>
+          </div>
         </div>
         <div class="result-actions">
-          <button class="ui-button primary" data-result-replay type="button" data-i18n="result.replay">Play again</button>
-          <button class="ui-button secondary" data-result-double type="button" data-i18n="result.double">Get x2 parts</button>
-          <button class="ui-button secondary" data-result-workshop type="button" data-i18n="menu.workshop">Workshop</button>
-          <button class="ui-button secondary" data-result-menu type="button" data-i18n="result.menu">Main menu</button>
+          <button class="ui-button atlas-sprite atlas-primary primary result-replay" data-result-replay type="button">
+            <span class="ui-atlas-icon icon-replay" aria-hidden="true"></span>
+            <span data-i18n="result.replay">Play again</span>
+          </button>
+          <button class="ui-button atlas-sprite atlas-secondary secondary result-secondary result-double" data-result-double type="button">
+            <span class="ui-atlas-icon icon-video" aria-hidden="true"></span>
+            <span data-result-double-label data-i18n="result.double">Reward ×2</span>
+          </button>
+          <button class="ui-button atlas-sprite atlas-secondary secondary result-secondary" data-result-workshop type="button">
+            <span class="ui-atlas-icon icon-workshop" aria-hidden="true"></span>
+            <span data-i18n="menu.workshop">Workshop</span>
+          </button>
+          <button class="ui-button atlas-sprite atlas-secondary secondary result-secondary" data-result-menu type="button">
+            <span class="ui-atlas-icon icon-home" aria-hidden="true"></span>
+            <span data-i18n="result.menu">Main menu</span>
+          </button>
         </div>
       </div>
     </section>
-    <div class="match-timer" data-match-timer hidden>03:00</div>
     <div class="toast" data-toast hidden></div>
     <div class="settings-panel">
     <label class="setting-row" data-tooltip="Количество ботов на арене. Движение, RPM и урон у них считаются по тем же правилам, что у игрока.">
@@ -1524,18 +1347,9 @@
       </label>
     </div>
     <div class="fps-counter" data-fps-counter>FPS: --</div>
-    <button class="deathmatch-scoreboard-button" data-deathmatch-scoreboard type="button" aria-pressed="false">
-      <span data-i18n="hud.leaderboard">Leaderboard</span>
-    </button>
-    <div class="compact-leaderboard" data-compact-leaderboard hidden></div>
-    <div class="deathmatch-overlay" data-deathmatch-overlay hidden>
-      <div class="deathmatch-leaderboard" data-deathmatch-leaderboard></div>
-      <button class="deathmatch-continue" data-deathmatch-continue type="button" hidden disabled>
-        <span>Continue</span>
-      </button>
-    </div>
+    <div class="deathmatch-alive" data-deathmatch-alive hidden>10/10</div>
     <div class="mobile-controls" data-mobile-controls aria-hidden="false">
-      <div class="mobile-joystick" data-mobile-joystick role="application" aria-label="Move">
+      <div class="mobile-joystick" data-mobile-joystick role="application" data-i18n-aria="hud.move" aria-label="Move">
         <div class="mobile-joystick-thumb" data-mobile-joystick-thumb></div>
       </div>
       <div class="mobile-action-buttons">

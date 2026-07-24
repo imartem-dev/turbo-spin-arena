@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { TranslationKey } from "../i18n";
-import { colorCatalog, modelCatalog } from "../progression/catalog";
+import { auraCatalog, colorCatalog, modelCatalog } from "../progression/catalog";
 import { createDefaultProfile } from "../progression/playerProfile";
-import type { MatchResult } from "../progression/matchProgression";
 import {
   deriveCatalogCardModel,
   deriveUpgradeCardModel,
   formatUpgradeValueDisplay,
-  getResultStatRows,
 } from "./gameUi";
-import { selectCompactLeaderboardRows, type LeaderboardViewRow } from "./combatHud";
+import { formatAliveCounter } from "./combatHud";
 
 const translate = (key: TranslationKey): string => key;
 
@@ -22,16 +20,16 @@ describe("workshop UI models", () => {
     const model = deriveCatalogCardModel(profile, red!, "color_red");
     expect(model.previewing).toBe(true);
     expect(model.equipped).toBe(false);
-    expect(profile.selectedMaterialColors).toEqual(["color_white", "color_gray", "color_navy"]);
+    expect(profile.selectedMaterialColors).toEqual(["color_white", "color_yellow", "color_blue"]);
   });
 
   it("distinguishes equipped, insufficient, and premium purchase states", () => {
     const profile = createDefaultProfile();
     const equipped = deriveCatalogCardModel(profile, colorCatalog[0], undefined);
-    const insufficient = deriveCatalogCardModel(profile, colorCatalog.find((item) => item.id === "color_red")!, undefined);
+    const insufficient = deriveCatalogCardModel(profile, colorCatalog.find((item) => item.id === "color_silver")!, undefined);
     const premium = deriveCatalogCardModel(
       profile,
-      modelCatalog.find((item) => item.id === "model_street")!,
+      modelCatalog.find((item) => item.id === "model_legend")!,
       undefined,
     );
 
@@ -41,18 +39,31 @@ describe("workshop UI models", () => {
     expect(premium.hasPremiumPayment).toBe(true);
   });
 
-  it("makes every shipped model slot available for purchase", () => {
+  it("makes every shipped model slot purchasable", () => {
     const profile = createDefaultProfile();
+    profile.parts = 12_000;
     const purchasable = modelCatalog.slice(1).map((item) => deriveCatalogCardModel(profile, item, undefined));
     expect(purchasable.every((model) => model.state === "available")).toBe(true);
     expect(purchasable.every((model) => model.unavailable === false)).toBe(true);
+  });
+
+  it("keeps an unowned aura preview separate from the equipped form and color", () => {
+    const profile = createDefaultProfile();
+    const preview = deriveCatalogCardModel(profile, auraCatalog[1], "aura_2");
+
+    expect(preview.previewing).toBe(true);
+    expect(preview.equipped).toBe(false);
+    expect(preview.owned).toBe(false);
+    expect(preview.partsPrice).toBe(3000);
+    expect(profile.selectedAura).toBe("aura_1");
+    expect(profile.selectedAuraColor).toBe("color_yellow");
   });
 
   it("derives upgrade values and affordability from progression data", () => {
     const profile = createDefaultProfile();
     profile.parts = 99;
     const unavailable = deriveUpgradeCardModel(profile, "damage");
-    profile.parts = 100;
+    profile.parts = 250;
     const available = deriveUpgradeCardModel(profile, "damage");
 
     expect(unavailable.canAfford).toBe(false);
@@ -87,28 +98,9 @@ describe("workshop UI models", () => {
 });
 
 describe("mode-specific UI models", () => {
-  it("shows placement only for deathmatch results", () => {
-    const duel: MatchResult = { mode: "duel", outcome: "victory", place: 1, kills: 1, partsEarned: 50, bonusClaimed: false };
-    const deathmatch: MatchResult = { mode: "deathmatch", outcome: "placed", place: 3, kills: 4, partsEarned: 90, bonusClaimed: false };
-
-    expect(getResultStatRows(duel, translate)).toEqual(["result.kills: 1"]);
-    expect(getResultStatRows(deathmatch, translate)).toEqual(["result.place: 3", "result.kills: 4"]);
-  });
-
-  it("keeps top three leaderboard rows plus an out-of-range player row", () => {
-    const rows: LeaderboardViewRow[] = Array.from({ length: 6 }, (_, index) => ({
-      id: String(index + 1),
-      rank: index + 1,
-      name: `Bot ${index + 1}`,
-      kills: 0,
-      deaths: 0,
-      criticalHits: 0,
-      rating: 100 - index,
-      player: index === 5,
-      respawning: false,
-      invulnerable: false,
-    }));
-
-    expect(selectCompactLeaderboardRows(rows).map((row) => row.rank)).toEqual([1, 2, 3, 6]);
+  it("formats the deathmatch HUD as a bare alive fraction", () => {
+    expect(formatAliveCounter(10, 10)).toBe("10/10");
+    expect(formatAliveCounter(9, 10)).toBe("9/10");
+    expect(formatAliveCounter(1, 10)).toBe("1/10");
   });
 });

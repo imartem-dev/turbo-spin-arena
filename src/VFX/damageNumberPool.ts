@@ -24,6 +24,7 @@ type DamageNumberSprite = {
 };
 
 const poolSize = 10;
+const damageNumberScaleMultiplier = 3;
 const hiddenPosition = new THREE.Vector3(0, -40, 0);
 
 export class DamageNumberPool {
@@ -53,8 +54,8 @@ export class DamageNumberPool {
     damageNumber.age = 0;
     damageNumber.life = 0.85;
     damageNumber.maxLife = 0.85;
-    damageNumber.baseScale = 0.72 * options.criticalScale;
-    damageNumber.maxScale = 1.08 * options.criticalScale;
+    damageNumber.baseScale = 0.72 * options.criticalScale * damageNumberScaleMultiplier;
+    damageNumber.maxScale = 1.08 * options.criticalScale * damageNumberScaleMultiplier;
   }
 
   update(deltaTime: number): void {

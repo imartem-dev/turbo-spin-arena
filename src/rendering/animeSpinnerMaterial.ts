@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { applySpinnerShadingNormals } from "./spinnerShadingNormals";
 
 type SourceMaterial = THREE.Material & {
   color?: THREE.Color;
@@ -13,6 +14,7 @@ export type AnimeFillMaterial = THREE.MeshBasicMaterial & {
   userData: {
     spinnerFill?: boolean;
     spinnerPaintable?: boolean;
+    spinnerMatcapUniform?: THREE.IUniform<THREE.Texture>;
   };
 };
 
@@ -34,6 +36,93 @@ export type InstancedAnimeOptions = {
   freezeDissolve: THREE.Texture;
 };
 
+export type AnimeToonParameters = {
+  topBiasStart: number;
+  topBiasEnd: number;
+  shadowThreshold: number;
+  shadowTopBiasWeight: number;
+  lightThreshold: number;
+  lightTopBiasWeight: number;
+  shadeBase: number;
+  shadeShadowWeight: number;
+  shadeLightWeight: number;
+  rimEdgeStart: number;
+  rimEdgeEnd: number;
+  rimLightStart: number;
+  rimLightEnd: number;
+  rimStrength: number;
+  specularStart: number;
+  specularEnd: number;
+  specularExponent: number;
+  specularStrength: number;
+  matcapUvScale: number;
+  matcapMinGain: number;
+  matcapMaxGain: number;
+};
+
+export const animeToonDefaults: Readonly<AnimeToonParameters> = Object.freeze({
+  topBiasStart: 0.34,
+  topBiasEnd: 0.35,
+  shadowThreshold: 0.8,
+  shadowTopBiasWeight: 0.33,
+  lightThreshold: 0.85,
+  lightTopBiasWeight: 0.11,
+  shadeBase: 0.14,
+  shadeShadowWeight: 0.38,
+  shadeLightWeight: 0.25,
+  rimEdgeStart: 0,
+  rimEdgeEnd: 1,
+  rimLightStart: 0,
+  rimLightEnd: 0.85,
+  rimStrength: 0.13,
+  specularStart: 0.23,
+  specularEnd: 0.66,
+  specularExponent: 51,
+  specularStrength: 0.06,
+  matcapUvScale: 0.2,
+  matcapMinGain: 0.9,
+  matcapMaxGain: 1.7,
+});
+
+type AnimeToonParameterKey = keyof AnimeToonParameters;
+type AnimeToonUniforms = { [Key in AnimeToonParameterKey]: THREE.IUniform<number> };
+
+const animeToonParameters: AnimeToonParameters = { ...animeToonDefaults };
+const animeToonUniforms = Object.fromEntries(
+  (Object.keys(animeToonDefaults) as AnimeToonParameterKey[])
+    .map((key) => [key, { value: animeToonDefaults[key] }]),
+) as AnimeToonUniforms;
+
+export function getAnimeToonParameters(): AnimeToonParameters {
+  return { ...animeToonParameters };
+}
+
+export function setAnimeToonParameters(values: Partial<AnimeToonParameters>): void {
+  for (const key of Object.keys(values) as AnimeToonParameterKey[]) {
+    const value = values[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    animeToonParameters[key] = value;
+    animeToonUniforms[key].value = value;
+  }
+}
+
+export function resetAnimeToonParameters(): void {
+  setAnimeToonParameters(animeToonDefaults);
+}
+
+const fallbackMatcap = new THREE.DataTexture(new Uint8Array([148, 136, 125, 255]), 1, 1);
+fallbackMatcap.colorSpace = THREE.SRGBColorSpace;
+fallbackMatcap.needsUpdate = true;
+let spinnerMatcapTexture: THREE.Texture = fallbackMatcap;
+const animeFillMaterials = new Set<AnimeFillMaterial>();
+
+export function setAnimeSpinnerMatcapTexture(texture: THREE.Texture): void {
+  spinnerMatcapTexture = texture;
+  for (const material of animeFillMaterials) {
+    if (material.userData.spinnerMatcapUniform) material.userData.spinnerMatcapUniform.value = texture;
+  }
+}
+
 export function prepareSpinnerModel(
   source: THREE.Group,
   rotationX: number,
@@ -44,7 +133,7 @@ export function prepareSpinnerModel(
   content.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     object.geometry = object.geometry.clone();
-    if (!object.geometry.getAttribute("normal")) object.geometry.computeVertexNormals();
+    applySpinnerShadingNormals(object.geometry);
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     hasPaintMarkers ||= isPaintName(object.name) || materials.some((material) => isPaintName(material.name));
   });
@@ -93,7 +182,7 @@ export function createAnimeSpinnerVisual(
     const meshPaintable = !prepared.hasPaintMarkers || isPaintName(mesh.name);
     const fillMaterials = sourceMaterials.map((sourceMaterial) => {
       const paintable = meshPaintable || isPaintName(sourceMaterial.name);
-      const slot = resolvePaintSlot(sourceMaterial.name) ?? resolvePaintSlot(mesh.name) ?? 0;
+      const slot = resolveSpinnerPaintSlot(sourceMaterial.name) ?? resolveSpinnerPaintSlot(mesh.name) ?? 0;
       const material = createAnimeFillMaterial(sourceMaterial, paintable ? colors[slot] : undefined);
       material.userData.spinnerFill = true;
       material.userData.spinnerPaintable = paintable;
@@ -145,6 +234,8 @@ export function createAnimeFillMaterial(source: THREE.Material, selectedColor?: 
     toneMapped: false,
   }) as AnimeFillMaterial;
   installAnimeShader(material);
+  animeFillMaterials.add(material);
+  material.addEventListener("dispose", () => animeFillMaterials.delete(material));
   return material;
 }
 
@@ -171,7 +262,31 @@ export function isAnimeSpinnerFill(object: THREE.Object3D): boolean {
 }
 
 function installAnimeShader(material: AnimeFillMaterial, instanced?: InstancedAnimeOptions): void {
+  const matcapUniform = { value: spinnerMatcapTexture };
+  material.userData.spinnerMatcapUniform = matcapUniform;
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.uSpinnerMatcap = matcapUniform;
+    shader.uniforms.uAnimeTopBiasStart = animeToonUniforms.topBiasStart;
+    shader.uniforms.uAnimeTopBiasEnd = animeToonUniforms.topBiasEnd;
+    shader.uniforms.uAnimeShadowThreshold = animeToonUniforms.shadowThreshold;
+    shader.uniforms.uAnimeShadowTopBiasWeight = animeToonUniforms.shadowTopBiasWeight;
+    shader.uniforms.uAnimeLightThreshold = animeToonUniforms.lightThreshold;
+    shader.uniforms.uAnimeLightTopBiasWeight = animeToonUniforms.lightTopBiasWeight;
+    shader.uniforms.uAnimeShadeBase = animeToonUniforms.shadeBase;
+    shader.uniforms.uAnimeShadeShadowWeight = animeToonUniforms.shadeShadowWeight;
+    shader.uniforms.uAnimeShadeLightWeight = animeToonUniforms.shadeLightWeight;
+    shader.uniforms.uAnimeRimEdgeStart = animeToonUniforms.rimEdgeStart;
+    shader.uniforms.uAnimeRimEdgeEnd = animeToonUniforms.rimEdgeEnd;
+    shader.uniforms.uAnimeRimLightStart = animeToonUniforms.rimLightStart;
+    shader.uniforms.uAnimeRimLightEnd = animeToonUniforms.rimLightEnd;
+    shader.uniforms.uAnimeRimStrength = animeToonUniforms.rimStrength;
+    shader.uniforms.uAnimeSpecularStart = animeToonUniforms.specularStart;
+    shader.uniforms.uAnimeSpecularEnd = animeToonUniforms.specularEnd;
+    shader.uniforms.uAnimeSpecularExponent = animeToonUniforms.specularExponent;
+    shader.uniforms.uAnimeSpecularStrength = animeToonUniforms.specularStrength;
+    shader.uniforms.uAnimeMatcapUvScale = animeToonUniforms.matcapUvScale;
+    shader.uniforms.uAnimeMatcapMinGain = animeToonUniforms.matcapMinGain;
+    shader.uniforms.uAnimeMatcapMaxGain = animeToonUniforms.matcapMaxGain;
     if (instanced) {
       shader.uniforms.uFreezeMask = { value: instanced.freezeMask };
       shader.uniforms.uFreezeDissolve = { value: instanced.freezeDissolve };
@@ -213,6 +328,28 @@ function installAnimeShader(material: AnimeFillMaterial, instanced?: InstancedAn
       varying vec3 vAnimeNormal;
       varying vec3 vAnimePosition;
       varying vec3 vAnimeViewPosition;
+      uniform sampler2D uSpinnerMatcap;
+      uniform float uAnimeTopBiasStart;
+      uniform float uAnimeTopBiasEnd;
+      uniform float uAnimeShadowThreshold;
+      uniform float uAnimeShadowTopBiasWeight;
+      uniform float uAnimeLightThreshold;
+      uniform float uAnimeLightTopBiasWeight;
+      uniform float uAnimeShadeBase;
+      uniform float uAnimeShadeShadowWeight;
+      uniform float uAnimeShadeLightWeight;
+      uniform float uAnimeRimEdgeStart;
+      uniform float uAnimeRimEdgeEnd;
+      uniform float uAnimeRimLightStart;
+      uniform float uAnimeRimLightEnd;
+      uniform float uAnimeRimStrength;
+      uniform float uAnimeSpecularStart;
+      uniform float uAnimeSpecularEnd;
+      uniform float uAnimeSpecularExponent;
+      uniform float uAnimeSpecularStrength;
+      uniform float uAnimeMatcapUvScale;
+      uniform float uAnimeMatcapMinGain;
+      uniform float uAnimeMatcapMaxGain;
       ${instanced ? "uniform sampler2D uFreezeMask; uniform sampler2D uFreezeDissolve; varying float vInstanceFreeze;" : ""}`,
     );
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -223,15 +360,19 @@ function installAnimeShader(material: AnimeFillMaterial, instanced?: InstancedAn
       vec3 animeViewDirection = normalize(vAnimeViewPosition);
       vec3 animeHalfDirection = normalize(animeLightDirection + animeViewDirection);
       float animeLight = clamp(dot(animeNormal, animeLightDirection) * 0.5 + 0.5, 0.0, 1.0);
-      float animeTopBias = smoothstep(0.08, 0.72, animeNormal.y);
-      float animeShadowBand = step(0.28, animeLight + animeTopBias * 0.12);
-      float animeLightBand = step(0.68, animeLight);
-      float animeShade = 0.68 + animeShadowBand * 0.2 + animeLightBand * 0.12;
-      float animeRim = smoothstep(0.62, 0.84, 1.0 - max(dot(animeNormal, animeViewDirection), 0.0)) * smoothstep(0.2, 0.72, animeLight);
-      float animeSpecular = smoothstep(0.9, 0.98, pow(max(dot(animeNormal, animeHalfDirection), 0.0), 28.0)) * animeLightBand;
+      float animeTopBias = smoothstep(uAnimeTopBiasStart, uAnimeTopBiasEnd, animeNormal.y);
+      float animeShadowBand = step(uAnimeShadowThreshold, animeLight + animeTopBias * uAnimeShadowTopBiasWeight);
+      float animeLightBand = step(uAnimeLightThreshold, animeLight + animeTopBias * uAnimeLightTopBiasWeight);
+      float animeShade = uAnimeShadeBase + animeShadowBand * uAnimeShadeShadowWeight + animeLightBand * uAnimeShadeLightWeight;
+      float animeRim = smoothstep(uAnimeRimEdgeStart, uAnimeRimEdgeEnd, 1.0 - max(dot(animeNormal, animeViewDirection), 0.0)) * smoothstep(uAnimeRimLightStart, uAnimeRimLightEnd, animeLight);
+      float animeSpecular = smoothstep(uAnimeSpecularStart, uAnimeSpecularEnd, pow(max(dot(animeNormal, animeHalfDirection), 0.0), uAnimeSpecularExponent)) * animeLightBand;
       diffuseColor.rgb *= animeShade;
-      diffuseColor.rgb += diffuseColor.rgb * animeRim * 0.16;
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), animeSpecular * 0.08);
+      vec2 animeMatcapUv = animeNormal.xy * vec2(uAnimeMatcapUvScale, -uAnimeMatcapUvScale) + 0.5;
+      vec3 animeMatcap = texture2D(uSpinnerMatcap, animeMatcapUv).rgb;
+      float animeMatcapLuma = dot(animeMatcap, vec3(0.299, 0.587, 0.114));
+      diffuseColor.rgb *= mix(uAnimeMatcapMinGain, uAnimeMatcapMaxGain, animeMatcapLuma);
+      diffuseColor.rgb += diffuseColor.rgb * animeRim * uAnimeRimStrength;
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), animeSpecular * uAnimeSpecularStrength);
       ${instanced ? `
       vec2 freezeUv = vAnimePosition.xz * 0.73 + vec2(0.31, 0.47);
       float freezeMaskValue = texture2D(uFreezeMask, freezeUv).r;
@@ -244,7 +385,7 @@ function installAnimeShader(material: AnimeFillMaterial, instanced?: InstancedAn
       diffuseColor.rgb = mix(diffuseColor.rgb, freezeBandColor, freezeFactor);` : ""}`,
     );
   };
-  material.customProgramCacheKey = () => instanced ? "anime-spinner-instanced-freeze-v3" : "anime-spinner-static-v3";
+  material.customProgramCacheKey = () => instanced ? "anime-spinner-instanced-freeze-v8" : "anime-spinner-static-v8";
   material.needsUpdate = true;
 }
 
@@ -252,7 +393,7 @@ function isPaintName(name: string): boolean {
   return /^(?:paint(?:_|$)|m_(?:color_[12]|base)$)/i.test(name.trim());
 }
 
-function resolvePaintSlot(name: string): 0 | 1 | 2 | null {
+export function resolveSpinnerPaintSlot(name: string): 0 | 1 | 2 | null {
   const normalized = name.trim();
   const paintMatch = /^paint[_ -]?([123])(?:\b|_)/i.exec(normalized);
   if (paintMatch) return (Number(paintMatch[1]) - 1) as 0 | 1 | 2;

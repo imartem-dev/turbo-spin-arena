@@ -1,0 +1,794 @@
+{
+  "mode.duel": {
+    "source": "1v1",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1065"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "mode.deathmatch": {
+    "source": "Arena",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1069"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.settings": {
+    "source": "Settings",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1053"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "settings.botLevel": {
+    "source": "Bot level",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1116"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "bot.easy": {
+    "source": "Easy",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1118"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "bot.normal": {
+    "source": "Normal",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1119"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "bot.hard": {
+    "source": "Hard",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1120"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.play": {
+    "source": "Play",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1076",
+      "index.html:1174"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.workshop": {
+    "source": "Workshop",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1104",
+      "index.html:1202"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.shop": {
+    "source": "Shop",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1169"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.sound": {
+    "source": "Sound on",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1056",
+      "src/ui/mainMenu.ts:59"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "menu.soundOff": {
+    "source": "Sound off",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/mainMenu.ts:59"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "menu.controls": {
+    "source": "Menu controls",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1052"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "menu.sections": {
+    "source": "Menu sections",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1102"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "menu.openChest": {
+    "source": "Open chest",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1080",
+      "index.html:1082"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "rewards.title": {
+    "source": "Timed chests",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1138",
+      "src/ui/timedRewardsUi.ts:81"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.open": {
+    "source": "Open",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/timedRewardsUi.ts:73",
+      "src/ui/timedRewardsUi.ts:150"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.claimed": {
+    "source": "Claimed",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/timedRewardsUi.ts:151"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.received": {
+    "source": "Reward received",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1144"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.parts": {
+    "source": "Parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/timedRewardsUi.ts:137"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.compensation": {
+    "source": "Compensation",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/timedRewardsUi.ts:142"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.continue": {
+    "source": "Continue",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1146"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "rewards.close": {
+    "source": "Close rewards",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1139"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "dev.settings": {
+    "source": "Development settings",
+    "translation": "",
+    "category": "visible",
+    "context": "Development settings disclosure shown in the menu when developer controls are enabled.",
+    "usedAt": [
+      "index.html:1113"
+    ],
+    "reason": "Development settings disclosure shown in the menu when developer controls are enabled."
+  },
+  "workshop.title": {
+    "source": "Workshop",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1157"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.appearance": {
+    "source": "Appearance",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1167",
+      "src/ui/gameUi.ts:223"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.upgrades": {
+    "source": "Upgrades",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1168"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.rotate": {
+    "source": "Rotate spinner",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "index.html:1164"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.elements": {
+    "source": "Elements",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/gameUi.ts:159",
+      "src/ui/gameUi.ts:487"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.colors": {
+    "source": "Colors",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/gameUi.ts:161",
+      "src/ui/gameUi.ts:423"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.offers": {
+    "source": "Premium",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/gameUi.ts:739"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.owned": {
+    "source": "Owned",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:696"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.equipped": {
+    "source": "Equipped",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:692",
+      "src/ui/gameUi.ts:708"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.buy": {
+    "source": "Buy",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/gameUi.ts:269"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.equip": {
+    "source": "Equip",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/ui/gameUi.ts:692",
+      "src/ui/gameUi.ts:708"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "workshop.previewing": {
+    "source": "Previewing",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:668",
+      "src/ui/gameUi.ts:694"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.available": {
+    "source": "Available",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:699"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.premium": {
+    "source": "Premium",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:698"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.unavailable": {
+    "source": "Payments are unavailable",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:354"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "workshop.insufficient": {
+    "source": "Not enough parts",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Workshop control label or accessibility text.",
+    "usedAt": [
+      "src/ui/gameUi.ts:271",
+      "src/ui/gameUi.ts:722"
+    ],
+    "reason": "Used as title or aria-label/status text in Workshop controls, including non-visible accessibility text."
+  },
+  "common.previous": {
+    "source": "Previous",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "src/ui/gameUi.ts:651"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "common.next": {
+    "source": "Next",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "src/ui/gameUi.ts:652"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "parts.name": {
+    "source": "Parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Currency/unit/level label rendered alongside player-facing values.",
+    "usedAt": [
+      "index.html:1047",
+      "index.html:1158",
+      "src/ui/gameUi.ts:269",
+      "src/ui/gameUi.ts:295"
+    ],
+    "reason": "Currency/unit/level label rendered alongside player-facing values."
+  },
+  "unit.secondsShort": {
+    "source": "sec",
+    "translation": "",
+    "category": "visible",
+    "context": "Currency/unit/level label rendered alongside player-facing values.",
+    "usedAt": [
+      "src/ui/gameUi.ts:953"
+    ],
+    "reason": "Currency/unit/level label rendered alongside player-facing values."
+  },
+  "result.earned": {
+    "source": "Reward",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1185"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "result.replay": {
+    "source": "Play again",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1194"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "result.double": {
+    "source": "Reward ×2",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1198"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "result.menu": {
+    "source": "Main menu",
+    "translation": "",
+    "category": "accessibility",
+    "context": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text).",
+    "usedAt": [
+      "index.html:1153",
+      "index.html:1155",
+      "index.html:1206"
+    ],
+    "reason": "Used in aria-label/title attributes for navigation or controls (and sometimes also visible text)."
+  },
+  "auth.open": {
+    "source": "Cloud save",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1108"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "auth.title": {
+    "source": "Save progress in the cloud?",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1128"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "auth.benefit": {
+    "source": "Signing in makes progress available on your other devices. You can keep playing as a guest without signing in.",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1129"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "auth.confirm": {
+    "source": "Sign in",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1131"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "auth.cancel": {
+    "source": "Continue as guest",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "index.html:1132"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "catalog.model.default": {
+    "source": "Stock",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:24"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.model.street": {
+    "source": "Street",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:25"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.model.turbo": {
+    "source": "Turbo",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:26"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.model.legend": {
+    "source": "Legend",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:27"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.aura.one": {
+    "source": "Aura 1",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:83"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.aura.two": {
+    "source": "Aura 2",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:84"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "catalog.aura.three": {
+    "source": "Aura 3",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/progression/catalog.ts:85"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.noAds": {
+    "source": "No Ads",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:345",
+      "src/ui/gameUi.ts:743"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts500": {
+    "source": "500 parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:344",
+      "src/ui/gameUi.ts:744"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts3000": {
+    "source": "3000 parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:745"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts7500": {
+    "source": "7,500 parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:341"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts21000": {
+    "source": "21,000 parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:342",
+      "src/ui/gameUi.ts:343"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts21000Aura3": {
+    "source": "21,000 parts + Aura 3",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:343"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "offer.parts50000": {
+    "source": "50,000 parts",
+    "translation": "",
+    "category": "visible",
+    "context": "Catalog/shop item name or offer label passed to the Workshop/shop UI.",
+    "usedAt": [
+      "src/ui/gameUi.ts:344"
+    ],
+    "reason": "Catalog/shop item name or offer label passed to the Workshop/shop UI."
+  },
+  "common.level": {
+    "source": "LVL",
+    "translation": "",
+    "category": "visible",
+    "context": "Currency/unit/level label rendered alongside player-facing values.",
+    "usedAt": [
+      "src/ui/gameUi.ts:255"
+    ],
+    "reason": "Currency/unit/level label rendered alongside player-facing values."
+  },
+  "element.fire": {
+    "source": "Fire",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/progression/catalog.ts:17"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "element.ice": {
+    "source": "Ice",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/progression/catalog.ts:18"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "element.earth": {
+    "source": "Earth",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/progression/catalog.ts:20"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "element.lightning": {
+    "source": "Lightning",
+    "translation": "",
+    "category": "visible",
+    "context": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function.",
+    "usedAt": [
+      "src/progression/catalog.ts:19"
+    ],
+    "reason": "Player-facing interface, gameplay result, reward, authentication, settings, Workshop, or HUD text rendered through the translation function."
+  },
+  "hud.dash": {
+    "source": "Dash",
+    "translation": "",
+    "category": "visible",
+    "context": "Combat HUD label or bonus/status label shown during a match.",
+    "usedAt": [
+      "index.html:1351"
+    ],
+    "reason": "Combat HUD label or bonus/status label shown during a match."
+  },
+  "hud.ultimate": {
+    "source": "Ultimate",
+    "translation": "",
+    "category": "visible",
+    "context": "Combat HUD label or bonus/status label shown during a match.",
+    "usedAt": [
+      "index.html:1355"
+    ],
+    "reason": "Combat HUD label or bonus/status label shown during a match."
+  },
+  "hud.player": {
+    "source": "Player",
+    "translation": "",
+    "category": "visible",
+    "context": "Combat HUD label or bonus/status label shown during a match.",
+    "usedAt": [
+      "index.html:406",
+      "index.html:809"
+    ],
+    "reason": "Combat HUD label or bonus/status label shown during a match."
+  },
+  "hud.move": {
+    "source": "Move",
+    "translation": "",
+    "category": "visible",
+    "context": "Combat HUD label or bonus/status label shown during a match.",
+    "usedAt": [
+      "index.html:1345"
+    ],
+    "reason": "Combat HUD label or bonus/status label shown during a match."
+  },
+  "orientation.rotate": {
+    "source": "Rotate your device",
+    "translation": "",
+    "category": "visible",
+    "context": "Orientation overlay instruction shown to the player.",
+    "usedAt": [
+      "index.html:1042"
+    ],
+    "reason": "Orientation overlay instruction shown to the player."
+  }
+}

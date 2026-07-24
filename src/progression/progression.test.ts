@@ -1,25 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { calculateMatchReward } from "./matchProgression";
 import { auraCatalog, colorCatalog, trailCatalog } from "./catalog";
-import { createDefaultProfile, getUpgradePrice, getUpgradeValue, grantOwnedItem, loadPlayerProfile } from "./playerProfile";
+import {
+  createDefaultProfile,
+  getUpgradePrice,
+  getUpgradeValue,
+  grantOwnedItem,
+  loadPlayerProfile,
+  mergePlayerProfiles,
+} from "./playerProfile";
 
 describe("match rewards", () => {
   it("rewards duel participation and victory", () => {
-    expect(calculateMatchReward("duel", false, 0, 2)).toBe(20);
-    expect(calculateMatchReward("duel", true, 1, 1)).toBe(50);
+    expect(calculateMatchReward("duel", false, 0)).toBe(100);
+    expect(calculateMatchReward("duel", true, 0)).toBe(250);
   });
 
-  it("combines deathmatch participation, kills and placement", () => {
-    expect(calculateMatchReward("deathmatch", false, 3, 1)).toBe(110);
-    expect(calculateMatchReward("deathmatch", false, 2, 3)).toBe(70);
-    expect(calculateMatchReward("deathmatch", false, 2, 7)).toBe(40);
+  it("rewards fifty parts for each earlier deathmatch elimination", () => {
+    expect(calculateMatchReward("deathmatch", false, 0)).toBe(80);
+    expect(calculateMatchReward("deathmatch", false, 1)).toBe(80);
+    expect(calculateMatchReward("deathmatch", false, 8)).toBe(350);
+    expect(calculateMatchReward("deathmatch", true, 9)).toBe(500);
+    expect(calculateMatchReward("deathmatch", true, 99)).toBe(500);
   });
 });
 
 describe("unlimited tuning", () => {
   it("uses the specified quadratic price curve", () => {
-    expect(getUpgradePrice(0)).toBe(100);
-    expect(getUpgradePrice(10)).toBe(1500);
+    expect(getUpgradePrice(0)).toBe(250);
+    expect(getUpgradePrice(10)).toBe(1750);
   });
 
   it("improves every stat without making dash cooldown negative", () => {
@@ -32,7 +41,7 @@ describe("unlimited tuning", () => {
 });
 
 describe("profile migration", () => {
-  it("migrates v2 cosmetics to the v3 catalogs", () => {
+  it("resets legacy cosmetic purchases to the release defaults", () => {
     const storage = new Map<string, string>();
     storage.set("turbo-spin-arena.profile.v1", JSON.stringify({
       version: 2,
@@ -51,11 +60,14 @@ describe("profile migration", () => {
     });
     try {
       const profile = loadPlayerProfile();
-      expect(profile.version).toBe(3);
-      expect(profile.selectedMaterialColors).toEqual(["color_blue", "color_yellow", "color_violet"]);
-      expect(profile.selectedTrail).toBe("trail_cyan");
-      expect(profile.selectedAura).toBe("aura_green");
-      expect(profile.ownedItems).toContain("aura_crit");
+      expect(profile.version).toBe(8);
+      expect(profile.selectedMaterialColors).toEqual(["color_white", "color_yellow", "color_blue"]);
+      expect(profile.selectedTrail).toBe("trail_white");
+      expect(profile.selectedAura).toBe("aura_1");
+      expect(profile.selectedAuraColor).toBe("color_yellow");
+      expect(profile.ownedItems).toContain("aura_1");
+      expect(profile.ownedItems).not.toContain("aura_2");
+      expect(profile.ownedItems).not.toContain("color_violet");
     } finally {
       if (previousStorage) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previousStorage });
       else delete (globalThis as { localStorage?: Storage }).localStorage;
@@ -75,6 +87,32 @@ describe("profile migration", () => {
       else delete (globalThis as { localStorage?: Storage }).localStorage;
     }
   });
+
+  it("uses the newest equipment and balance when merging cloud progress", () => {
+    const local = createDefaultProfile();
+    local.updatedAt = 100;
+    local.parts = 50;
+    const cloud = createDefaultProfile();
+    cloud.updatedAt = 200;
+    cloud.parts = 25;
+    cloud.selectedElement = "fire";
+    cloud.selectedModel = "model_turbo";
+    cloud.selectedAura = "aura_2";
+    cloud.selectedAuraColor = "color_mint";
+    cloud.ownedItems.push("model_turbo", "aura_2");
+    cloud.timedRewards.currentIndex = 3;
+    cloud.timedRewards.activeMsInCycle = 1_800_000;
+
+    const merged = mergePlayerProfiles(local, cloud);
+
+    expect(merged.parts).toBe(25);
+    expect(merged.selectedElement).toBe("fire");
+    expect(merged.selectedModel).toBe("model_turbo");
+    expect(merged.selectedAura).toBe("aura_2");
+    expect(merged.selectedAuraColor).toBe("color_mint");
+    expect(merged.ownedItems).toContain("model_turbo");
+    expect(merged.timedRewards).toMatchObject({ currentIndex: 3, activeMsInCycle: 1_800_000 });
+  });
 });
 
 describe("cosmetic catalogs", () => {
@@ -87,16 +125,33 @@ describe("cosmetic catalogs", () => {
 
   it("uses the requested tier prices and Yan product ids", () => {
     expect(colorCatalog.find((item) => item.id === "color_white")?.paymentOptions).toEqual([]);
-    expect(colorCatalog.find((item) => item.id === "color_red")?.paymentOptions).toEqual([{ kind: "parts", amount: 250 }]);
-    expect(trailCatalog.find((item) => item.id === "trail_red")?.paymentOptions).toEqual([{ kind: "parts", amount: 500 }]);
-    expect(colorCatalog.find((item) => item.id === "color_mint")?.paymentOptions).toEqual([{ kind: "yan", productId: "material_color_mint" }]);
-    expect(trailCatalog.find((item) => item.id === "trail_mint")?.paymentOptions).toEqual([{ kind: "yan", productId: "trail_color_mint" }]);
+    expect(colorCatalog.filter((item) => item.paymentOptions.length === 0).map((item) => item.id)).toEqual([
+      "color_white",
+      "color_black",
+      "color_yellow",
+      "color_blue",
+      "color_green",
+      "color_red",
+    ]);
+    expect(colorCatalog.find((item) => item.id === "color_bronze")?.color).toBe("#B56A36");
+    expect(colorCatalog.find((item) => item.id === "color_sand")?.color).toBe("#E7C78B");
+    expect(colorCatalog.find((item) => item.id === "color_azure")?.color).toBe("#168CFF");
+    expect(colorCatalog.find((item) => item.id === "color_silver")?.color).toBe("#C9CED8");
+    expect(colorCatalog.find((item) => item.id === "color_silver")?.paymentOptions).toEqual([{ kind: "parts", amount: 500 }]);
+    expect(trailCatalog.find((item) => item.id === "trail_silver")?.paymentOptions).toEqual([]);
+    expect(colorCatalog.find((item) => item.id === "color_mint")?.paymentOptions).toEqual([{ kind: "parts", amount: 500 }]);
+    expect(trailCatalog.find((item) => item.id === "trail_mint")?.paymentOptions).toEqual([]);
   });
 
-  it("always provides crit aura and has no empty aura", () => {
+  it("ships three aura forms with the requested unlock prices", () => {
     const profile = createDefaultProfile();
-    expect(profile.ownedItems).toContain("aura_crit");
-    expect(profile.selectedAura).toBe("aura_crit");
-    expect(auraCatalog.some((item) => item.id === "aura_none")).toBe(false);
+    expect(profile.ownedItems).toContain("aura_1");
+    expect(profile.selectedAura).toBe("aura_1");
+    expect(profile.selectedAuraColor).toBe("color_yellow");
+    expect(auraCatalog.map((item) => item.paymentOptions)).toEqual([
+      [],
+      [{ kind: "parts", amount: 3000 }],
+      [{ kind: "yan", productId: "aura_3" }],
+    ]);
   });
 });

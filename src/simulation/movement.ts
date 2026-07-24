@@ -26,6 +26,7 @@ export const criticalSpeedRatio = 0.95;
 export const rpmRecoveryResponsePerMeter = 1 / 15;
 export const speedLimitMinRatio = 0.75;
 export const speedLimitRampResponse = 1;
+export const duelWinnerCoastDamping = 3.5;
 
 export function getRpmMoveSpeedRatio(currentRPM: number, maxRPM: number): number {
   const rpmRatio = maxRPM > 0 ? Math.min(Math.max(currentRPM / maxRPM, 0), 1) : 0;
@@ -63,4 +64,8 @@ export function resetSpeedLimitRatio(spinner: SpeedLimitRampState): void {
 
 export function isCritSpeedReady(spinner: CritSpeedState): boolean {
   return spinner.velocity.length() >= getCriticalSpeed(spinner);
+}
+
+export function getDuelWinnerCoastVelocityScale(deltaTime: number): number {
+  return Math.exp(-Math.max(0, deltaTime) * duelWinnerCoastDamping);
 }

@@ -1,4 +1,4 @@
-import type { TranslationKey } from "../i18n";
+import type { LanguageCode, TranslationKey } from "../i18n";
 import type { GameMode } from "../progression/matchProgression";
 
 type Translator = (key: TranslationKey) => string;
@@ -7,13 +7,14 @@ type MainMenuOptions = {
   initialMode: GameMode;
   devMode: boolean;
   t: Translator;
+  language: LanguageCode;
+  languages: ReadonlyArray<{ code: LanguageCode; name: string }>;
   onModeSelected: (mode: GameMode) => void;
-  onClaimFreeChest: () => number;
+  onLanguageSelected: (language: LanguageCode) => void;
+  onSoundChanged: (enabled: boolean) => void;
 };
 
 const soundStorageKey = "turbo-spin-arena:menu-sound";
-const freeChestReadyAtStorageKey = "turbo-spin-arena:free-chest-ready-at-v2";
-const freeChestCountdownMs = ((2 * 60 + 15) * 60 + 47) * 1000;
 
 export function setupMainMenu(options: MainMenuOptions): void {
   const menu = document.querySelector<HTMLElement>("[data-start-menu]");
@@ -25,9 +26,18 @@ export function setupMainMenu(options: MainMenuOptions): void {
   configureDevelopmentControls(options.devMode);
   applyTranslations(options.t);
   bindModeSelection(options.initialMode, options.onModeSelected);
-  bindSoundControl(options.t);
-  bindSettingsControl();
-  bindFreeChest(options.t, options.onClaimFreeChest);
+  bindSoundControl(options.t, options.onSoundChanged);
+  bindLanguageControl(options);
+}
+
+export function refreshMainMenuTranslations(t: Translator): void {
+  applyTranslations(t);
+  const soundButton = document.querySelector<HTMLButtonElement>("[data-menu-sound]");
+  if (!soundButton) return;
+  const key = soundButton.classList.contains("sound-off") ? "menu.soundOff" : "menu.sound";
+  const label = t(key);
+  soundButton.setAttribute("aria-label", label);
+  soundButton.title = label;
 }
 
 function bindModeSelection(initialMode: GameMode, onModeSelected: (mode: GameMode) => void): void {
@@ -51,7 +61,7 @@ function bindModeSelection(initialMode: GameMode, onModeSelected: (mode: GameMod
   selectMode(initialMode);
 }
 
-function bindSoundControl(t: Translator): void {
+function bindSoundControl(t: Translator, onSoundChanged: (enabled: boolean) => void): void {
   const button = document.querySelector<HTMLButtonElement>("[data-menu-sound]");
   if (!button) return;
 
@@ -63,6 +73,10 @@ function bindSoundControl(t: Translator): void {
     button.setAttribute("aria-label", t(soundEnabled ? "menu.sound" : "menu.soundOff"));
     button.title = button.getAttribute("aria-label") ?? "";
     document.body.classList.toggle("sound-muted", !soundEnabled);
+    onSoundChanged(soundEnabled);
+    if (!soundEnabled) {
+      for (const media of document.querySelectorAll<HTMLMediaElement>("audio, video")) media.pause();
+    }
   };
 
   button.addEventListener("click", () => {
@@ -74,71 +88,56 @@ function bindSoundControl(t: Translator): void {
   render();
 }
 
-function bindSettingsControl(): void {
-  const button = document.querySelector<HTMLButtonElement>("[data-menu-settings]");
-  const controls = document.querySelector<HTMLDetailsElement>("[data-dev-controls]");
-  if (!button || !controls) return;
+function bindLanguageControl(options: MainMenuOptions): void {
+  const button = document.querySelector<HTMLButtonElement>("[data-menu-language]");
+  const menu = document.querySelector<HTMLElement>("[data-language-menu]");
+  const dialog = document.querySelector<HTMLElement>("[data-language-dialog]");
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-language-close]");
+  const label = document.querySelector<HTMLElement>("[data-language-code]");
+  if (!button || !menu || !dialog || !closeButton || !label) return;
 
-  button.addEventListener("click", () => {
-    const willOpen = controls.hidden;
-    controls.hidden = !controls.hidden;
-    controls.open = willOpen;
-  });
-}
-
-function configureDevelopmentControls(devMode: boolean): void {
-  const controls = document.querySelector<HTMLElement>("[data-dev-controls]");
-  if (!devMode) controls?.remove();
-}
-
-function bindFreeChest(t: Translator, onClaim: () => number): void {
-  const button = document.querySelector<HTMLButtonElement>("[data-free-chest]");
-  const timer = document.querySelector<HTMLTimeElement>("[data-free-chest-timer]");
-  const readyLabel = document.querySelector<HTMLElement>("[data-free-chest-ready]");
-  const rewardValue = document.querySelector<HTMLElement>("[data-free-chest-reward] b");
-  if (!button || !timer || !readyLabel || !rewardValue) return;
-
-  const storedReadyAt = Number(localStorage.getItem(freeChestReadyAtStorageKey));
-  let readyAt = Number.isFinite(storedReadyAt) && storedReadyAt > 0 ? storedReadyAt : 0;
-  let opening = false;
-
-  const update = (): void => {
-    const remainingSeconds = Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
-    const ready = remainingSeconds === 0 && !opening;
-    const hours = Math.floor(remainingSeconds / 3600);
-    const minutes = Math.floor((remainingSeconds % 3600) / 60);
-    const seconds = remainingSeconds % 60;
-    const value = [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
-    if (timer.textContent !== value) timer.textContent = value;
-    timer.dateTime = `PT${hours}H${minutes}M${seconds}S`;
-    timer.hidden = ready || opening;
-    readyLabel.hidden = !ready;
-    button.disabled = !ready;
-    button.classList.toggle("is-ready", ready);
-    const label = t(ready ? "menu.openChest" : "menu.freeChest");
-    button.setAttribute("aria-label", label);
-    button.title = label;
+  const close = (): void => {
+    dialog.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  };
+  const open = (): void => {
+    dialog.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  };
+  const render = (activeLanguage: LanguageCode): void => {
+    label.textContent = activeLanguage.toUpperCase();
+    menu.replaceChildren(...options.languages.map(({ code, name }) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "language-menu-item";
+      item.textContent = name;
+      item.dataset.language = code;
+      item.setAttribute("role", "menuitemradio");
+      item.setAttribute("aria-checked", String(code === activeLanguage));
+      item.classList.toggle("active", code === activeLanguage);
+      item.addEventListener("click", () => {
+        if (code !== activeLanguage) options.onLanguageSelected(code);
+        close();
+      });
+      return item;
+    }));
   };
 
-  button.addEventListener("click", () => {
-    if (opening || readyAt > Date.now()) return;
-    opening = true;
-    readyAt = Date.now() + freeChestCountdownMs;
-    localStorage.setItem(freeChestReadyAtStorageKey, String(readyAt));
-    rewardValue.textContent = `+${onClaim()}`;
-    button.classList.remove("is-ready");
-    button.classList.add("is-opening");
-    update();
-
-    window.setTimeout(() => {
-      button.classList.remove("is-opening");
-      opening = false;
-      update();
-    }, 1500);
+  render(options.language);
+  button.addEventListener("click", () => dialog.hidden ? open() : close());
+  closeButton.addEventListener("click", close);
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) close();
   });
 
-  update();
-  window.setInterval(update, 1000);
+  document.addEventListener("turbo-spin-arena:language-changed", ((event: CustomEvent<LanguageCode>) => {
+    render(event.detail);
+  }) as EventListener);
+}
+
+function configureDevelopmentControls(_devMode: boolean): void {
+  const controls = document.querySelector<HTMLElement>("[data-dev-controls]");
+  controls?.remove();
 }
 
 function applyTranslations(t: Translator): void {

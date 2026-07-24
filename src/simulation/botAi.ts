@@ -68,6 +68,14 @@ const maxPredictionTime = 0.45;
 const maxAttackStartDistancePadding = 1.3;
 const edgeAwareStartRatio = 0.72;
 const edgeAwareSafeTargetRatio = 0.78;
+const vectorPool: THREE.Vector3[] = [];
+let vectorPoolIndex = 0;
+
+function getScratchVector(): THREE.Vector3 {
+  const vector = vectorPool[vectorPoolIndex] ?? (vectorPool[vectorPoolIndex] = new THREE.Vector3());
+  vectorPoolIndex += 1;
+  return vector;
+}
 
 export function createBotAiDirector(): BotAiDirector {
   const states = new Map<BotAiSpinner, BotAgentState>();
@@ -93,6 +101,7 @@ export function createBotAiDirector(): BotAiDirector {
 
   return {
     update({ bots, targets, deltaTime, arenaRadius, settings }) {
+      vectorPoolIndex = 0;
       commands.clear();
       const liveBots = new Set(bots);
       for (const bot of states.keys()) {
@@ -240,7 +249,7 @@ function shouldAbortAttack(bot: BotAiSpinner, state: BotAgentState): boolean {
     return true;
   }
 
-  const toTarget = new THREE.Vector3().subVectors(target.group.position, bot.group.position);
+  const toTarget = getScratchVector().subVectors(target.group.position, bot.group.position);
   toTarget.y = 0;
   const distance = toTarget.length();
   if (distance <= bot.radius + target.radius + 0.2 || state.attackElapsed >= maxAttackDuration) {
@@ -248,7 +257,7 @@ function shouldAbortAttack(bot: BotAiSpinner, state: BotAgentState): boolean {
   }
 
   if (distance > 0.001 && bot.velocity.lengthSq() > 0.001) {
-    const attackAlignment = bot.velocity.clone().normalize().dot(toTarget.divideScalar(distance));
+    const attackAlignment = getScratchVector().copy(bot.velocity).normalize().dot(toTarget.divideScalar(distance));
     return attackAlignment < 0.2;
   }
 
@@ -263,12 +272,12 @@ function buildCommand(
   settings: BotAiSettings,
 ): BotAiCommand {
   if (!state.targetSpinner) {
-    const fallback = clampToArena(bot.group.position.clone(), arenaRadius - bot.radius);
-    return { role: "seek", target: fallback, visualTarget: fallback.clone(), targetSpinner: null };
+    const fallback = clampToArena(bot.group.position, arenaRadius - bot.radius);
+    return { role: "seek", target: fallback, visualTarget: getScratchVector().copy(fallback), targetSpinner: null };
   }
 
   const predictedTarget = predictTargetPosition(bot, state.targetSpinner, settings);
-  let target = predictedTarget.clone();
+  let target = getScratchVector().copy(predictedTarget);
 
   if (state.role === "seek") {
     target = state.attackBlocked
@@ -298,7 +307,7 @@ function predictTargetPosition(
 ): THREE.Vector3 {
   const distance = bot.group.position.distanceTo(target.group.position);
   const predictionTime = THREE.MathUtils.clamp(distance * settings.predictionTurnFactor, 1 / 30, maxPredictionTime);
-  return target.group.position.clone().addScaledVector(target.velocity, predictionTime);
+  return getScratchVector().copy(target.group.position).addScaledVector(target.velocity, predictionTime);
 }
 
 function getWindupPosition(
@@ -308,7 +317,7 @@ function getWindupPosition(
   windupDistance: number,
   arenaRadius: number,
 ): THREE.Vector3 {
-  const awayFromTarget = new THREE.Vector3().subVectors(bot.group.position, predictedTarget);
+  const awayFromTarget = getScratchVector().subVectors(bot.group.position, predictedTarget);
   awayFromTarget.y = 0;
   if (awayFromTarget.lengthSq() <= 0.0001) {
     awayFromTarget.subVectors(bot.group.position, target.targetPosition);
@@ -319,17 +328,17 @@ function getWindupPosition(
   }
 
   const direction = awayFromTarget.normalize();
-  const windupTarget = predictedTarget.clone().addScaledVector(direction, windupDistance);
+  const windupTarget = getScratchVector().copy(predictedTarget).addScaledVector(direction, windupDistance);
   return steerSetupTargetAwayFromEdge(windupTarget, predictedTarget, direction, windupDistance, arenaRadius, 1);
 }
 
 function getEvadePosition(bot: BotAiSpinner, bots: BotAiSpinner[], fallbackTarget: THREE.Vector3): THREE.Vector3 {
-  const evade = new THREE.Vector3();
+  const evade = getScratchVector().set(0, 0, 0);
   for (const other of bots) {
     if (other === bot) {
       continue;
     }
-    const away = new THREE.Vector3().subVectors(bot.group.position, other.group.position);
+    const away = getScratchVector().subVectors(bot.group.position, other.group.position);
     away.y = 0;
     const distance = away.length();
     if (distance <= 0.001 || distance > evadeThreatDistance) {
@@ -339,10 +348,10 @@ function getEvadePosition(bot: BotAiSpinner, bots: BotAiSpinner[], fallbackTarge
   }
 
   if (evade.lengthSq() <= 0.0001) {
-    return fallbackTarget.clone();
+    return getScratchVector().copy(fallbackTarget);
   }
 
-  return bot.group.position.clone().addScaledVector(evade.normalize(), 3.0);
+  return getScratchVector().copy(bot.group.position).addScaledVector(evade.normalize(), 3.0);
 }
 
 function getHoldPosition(
@@ -353,7 +362,7 @@ function getHoldPosition(
   sideSign: number,
   arenaRadius: number,
 ): THREE.Vector3 {
-  const awayFromTarget = new THREE.Vector3().subVectors(bot.group.position, predictedTarget);
+  const awayFromTarget = getScratchVector().subVectors(bot.group.position, predictedTarget);
   awayFromTarget.y = 0;
   if (awayFromTarget.lengthSq() <= 0.0001) {
     awayFromTarget.subVectors(bot.group.position, target.targetPosition);
@@ -364,9 +373,8 @@ function getHoldPosition(
   }
 
   const direction = awayFromTarget.normalize();
-  const tangent = new THREE.Vector3(-direction.z, 0, direction.x);
-  const holdTarget = predictedTarget
-    .clone()
+  const tangent = getScratchVector().set(-direction.z, 0, direction.x);
+  const holdTarget = getScratchVector().copy(predictedTarget)
     .addScaledVector(direction, holdDistance)
     .addScaledVector(tangent, sideSign * 0.8);
   return steerSetupTargetAwayFromEdge(holdTarget, predictedTarget, direction, holdDistance, arenaRadius, sideSign);
@@ -385,26 +393,26 @@ function steerSetupTargetAwayFromEdge(
     return setupTarget;
   }
 
-  const inward = new THREE.Vector3(-predictedTarget.x, 0, -predictedTarget.z);
+  const inward = getScratchVector().set(-predictedTarget.x, 0, -predictedTarget.z);
   if (inward.lengthSq() <= 0.0001) {
     return clampToArena(setupTarget, arenaRadius * edgeAwareSafeTargetRatio);
   }
   inward.normalize();
 
-  const tangent = new THREE.Vector3(-inward.z * sideSign, 0, inward.x * sideSign);
+  const tangent = getScratchVector().set(-inward.z * sideSign, 0, inward.x * sideSign);
   const tangentialDirection = tangent.dot(preferredDirection) >= 0 ? tangent : tangent.multiplyScalar(-1);
   const edgeAwareDirection = inward.multiplyScalar(0.72).addScaledVector(tangentialDirection, 0.28).normalize();
-  const edgeAwareTarget = predictedTarget.clone().addScaledVector(edgeAwareDirection, setupDistance);
+  const edgeAwareTarget = getScratchVector().copy(predictedTarget).addScaledVector(edgeAwareDirection, setupDistance);
   return clampToArena(edgeAwareTarget, arenaRadius * edgeAwareSafeTargetRatio);
 }
 
 function getSeparationOffset(bot: BotAiSpinner, bots: BotAiSpinner[], strength: number): THREE.Vector3 {
-  const offset = new THREE.Vector3();
+  const offset = getScratchVector().set(0, 0, 0);
   for (const other of bots) {
     if (other === bot) {
       continue;
     }
-    const away = new THREE.Vector3().subVectors(bot.group.position, other.group.position);
+    const away = getScratchVector().subVectors(bot.group.position, other.group.position);
     away.y = 0;
     const distance = away.length();
     if (distance <= 0.001 || distance > botAiSeparationRadius) {
@@ -429,14 +437,14 @@ function hasIncomingThreat(
       continue;
     }
 
-    const toBot = new THREE.Vector3().subVectors(bot.group.position, other.group.position);
+    const toBot = getScratchVector().subVectors(bot.group.position, other.group.position);
     toBot.y = 0;
     const distance = toBot.length();
     if (distance <= 0.001 || distance > evadeThreatDistance) {
       continue;
     }
 
-    if (other.velocity.clone().normalize().dot(toBot.divideScalar(distance)) >= evadeThreatDot) {
+    if (getScratchVector().copy(other.velocity).normalize().dot(toBot.divideScalar(distance)) >= evadeThreatDot) {
       return true;
     }
   }
@@ -475,7 +483,7 @@ function countNearbySpinners(target: BotAiSpinner, spinners: BotAiSpinner[], rad
 }
 
 function clampToArena(position: THREE.Vector3, maxRadius: number): THREE.Vector3 {
-  const clamped = position.clone();
+  const clamped = getScratchVector().copy(position);
   clamped.y = 0;
   const distanceFromCenter = Math.hypot(clamped.x, clamped.z);
   if (distanceFromCenter > maxRadius) {

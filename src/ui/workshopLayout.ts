@@ -6,8 +6,8 @@ export type WorkshopStageLayout = {
 
 export const workshopLogicalRects = {
   header: { x: 8, y: 8, width: 704, height: 40 },
-  preview: { x: 8, y: 56, width: 264, height: 232 },
-  play: { x: 50, y: 296, width: 180, height: 48 },
+  preview: { x: 8, y: 56, width: 304, height: 232 },
+  play: { x: 8, y: 292.57, width: 260, height: 59.43 },
   tabs: { x: 280, y: 56, width: 432, height: 40 },
   panel: { x: 276, y: 101, width: 440, height: 254 },
   panelInner: { x: 284, y: 108, width: 424, height: 240 },

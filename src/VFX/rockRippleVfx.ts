@@ -8,7 +8,6 @@ export type RockRippleVfxConfig = {
   duration: number;
   rockLifetime: number;
   dustLifetime: number;
-  groundCrackLifetime: number;
   debrisLifetime: number;
   debrisPerRock: number;
   rockShadowColor: string;
@@ -16,20 +15,17 @@ export type RockRippleVfxConfig = {
   rockLightColor: string;
   rockOutlineColor: string;
   rockOutlineThickness: number;
-  groundCrackColor: string;
   dustColor: string;
   lightDirection: [number, number, number];
 };
 
 type RockRippleTextures = {
   cellular: THREE.Texture;
-  cracks: THREE.Texture;
 };
 
 type RockLayout = {
   rockMatrices: THREE.Matrix4[];
   dustMatrices: THREE.Matrix4[];
-  crackMatrices: THREE.Matrix4[];
   debrisMatrices: THREE.Matrix4[];
   rockDelays: Float32Array;
   rockSeeds: Float32Array;
@@ -44,12 +40,11 @@ const buriedBaseY = -0.16;
 export const defaultRockRippleVfxConfig: RockRippleVfxConfig = {
   poolSize: 4,
   rocksPerRing: 7,
-  ringRadii: [0.9, 1.3, 1.9],
+  ringRadii: [3.6, 5.2, 7.6],
   ringDelays: [0, 0.2, 0.4],
   duration: 1,
   rockLifetime: 0.6,
   dustLifetime: 0.58,
-  groundCrackLifetime: 0.35,  
   debrisLifetime: 0.62,
   debrisPerRock: 2,
   rockShadowColor: "#c0a091",
@@ -57,7 +52,6 @@ export const defaultRockRippleVfxConfig: RockRippleVfxConfig = {
   rockLightColor: "#746665",
   rockOutlineColor: "#100b0a",
   rockOutlineThickness: 0.045,
-  groundCrackColor: "#090807",
   dustColor: "#756052",
   lightDirection: [0, -0.74, 0.68],
 };
@@ -69,7 +63,6 @@ export class RockRippleVfxPool {
   private readonly textures: RockRippleTextures;
   private readonly rockGeometry: THREE.BufferGeometry;
   private readonly dustGeometry: THREE.PlaneGeometry;
-  private readonly crackGeometry: THREE.PlaneGeometry;
   private readonly debrisGeometry: THREE.BufferGeometry;
   private readonly instances: RockRippleVfxInstance[];
   private nextIndex = 0;
@@ -82,7 +75,6 @@ export class RockRippleVfxPool {
     this.textures = loadTextures();
     this.rockGeometry = createRockSpikeGeometry(layout);
     this.dustGeometry = createGroundPlaneGeometry(layout.rockDelays, layout.rockSeeds);
-    this.crackGeometry = createGroundPlaneGeometry(layout.rockDelays, layout.rockSeeds);
     this.debrisGeometry = createDebrisGeometry(layout);
 
     this.instances = Array.from({ length: this.config.poolSize }, (_, index) => {
@@ -91,7 +83,6 @@ export class RockRippleVfxPool {
         this.textures,
         this.rockGeometry,
         this.dustGeometry,
-        this.crackGeometry,
         this.debrisGeometry,
         layout,
         index,
@@ -119,10 +110,8 @@ export class RockRippleVfxPool {
     }
     this.rockGeometry.dispose();
     this.dustGeometry.dispose();
-    this.crackGeometry.dispose();
     this.debrisGeometry.dispose();
     this.textures.cellular.dispose();
-    this.textures.cracks.dispose();
   }
 }
 
@@ -132,7 +121,6 @@ class RockRippleVfxInstance {
   private readonly config: RockRippleVfxConfig;
   private readonly rockMaterial: THREE.ShaderMaterial;
   private readonly outlineMaterial: THREE.ShaderMaterial;
-  private readonly crackMaterial: THREE.ShaderMaterial;
   private readonly dustMaterial: THREE.ShaderMaterial;
   private readonly debrisMaterial: THREE.ShaderMaterial;
   private age = 0;
@@ -143,7 +131,6 @@ class RockRippleVfxInstance {
     textures: RockRippleTextures,
     rockGeometry: THREE.BufferGeometry,
     dustGeometry: THREE.PlaneGeometry,
-    crackGeometry: THREE.PlaneGeometry,
     debrisGeometry: THREE.BufferGeometry,
     layout: RockLayout,
     index: number,
@@ -166,13 +153,6 @@ class RockRippleVfxInstance {
     rockMesh.renderOrder = 3;
     setInstanceMatrices(rockMesh, layout.rockMatrices);
 
-    this.crackMaterial = createGroundCrackMaterial(config, textures.cracks);
-    const crackMesh = new THREE.InstancedMesh(crackGeometry, this.crackMaterial, layout.crackMatrices.length);
-    crackMesh.name = "Rock Ripple Ground Cracks";
-    crackMesh.frustumCulled = false;
-    crackMesh.renderOrder = 1;
-    setInstanceMatrices(crackMesh, layout.crackMatrices);
-
     this.dustMaterial = createDustMaterial(config, textures.cellular);
     const dustMesh = new THREE.InstancedMesh(dustGeometry, this.dustMaterial, layout.dustMatrices.length);
     dustMesh.name = "Rock Ripple Dust";
@@ -187,7 +167,7 @@ class RockRippleVfxInstance {
     debrisMesh.renderOrder = 3;
     setInstanceMatrices(debrisMesh, layout.debrisMatrices);
 
-    this.group.add(crackMesh, outlineMesh, rockMesh, debrisMesh, dustMesh);
+    this.group.add(outlineMesh, rockMesh, debrisMesh, dustMesh);
   }
 
   spawn(position: THREE.Vector3): void {
@@ -211,7 +191,6 @@ class RockRippleVfxInstance {
 
     setAge(this.rockMaterial, this.age);
     setAge(this.outlineMaterial, this.age);
-    setAge(this.crackMaterial, this.age);
     setAge(this.dustMaterial, this.age);
     setAge(this.debrisMaterial, this.age);
   }
@@ -219,7 +198,6 @@ class RockRippleVfxInstance {
   dispose(): void {
     this.rockMaterial.dispose();
     this.outlineMaterial.dispose();
-    this.crackMaterial.dispose();
     this.dustMaterial.dispose();
     this.debrisMaterial.dispose();
   }
@@ -228,12 +206,10 @@ class RockRippleVfxInstance {
 function loadTextures(): RockRippleTextures {
   const loader = new THREE.TextureLoader();
   const cellular = loader.load(`${textureBase}T_VFX_NoiseF1.webp`);
-  const cracks = loader.load(`${textureBase}T_Cracks336.webp`);
   cellular.wrapS = THREE.RepeatWrapping;
   cellular.wrapT = THREE.RepeatWrapping;
   cellular.needsUpdate = true;
-  cracks.needsUpdate = true;
-  return { cellular, cracks };
+  return { cellular };
 }
 
 function createRockLayout(config: RockRippleVfxConfig): RockLayout {
@@ -241,7 +217,6 @@ function createRockLayout(config: RockRippleVfxConfig): RockLayout {
   const debrisCount = rockCount * config.debrisPerRock;
   const rockMatrices: THREE.Matrix4[] = [];
   const dustMatrices: THREE.Matrix4[] = [];
-  const crackMatrices: THREE.Matrix4[] = [];
   const debrisMatrices: THREE.Matrix4[] = [];
   const rockDelays = new Float32Array(rockCount);
   const rockSeeds = new Float32Array(rockCount);
@@ -276,12 +251,6 @@ function createRockLayout(config: RockRippleVfxConfig): RockLayout {
       scale.set(dustScale, dustScale, dustScale);
       dustMatrices.push(new THREE.Matrix4().compose(position, new THREE.Quaternion(), scale));
 
-      const crackScale = ringScale * THREE.MathUtils.lerp(1.75, 2.15, hash(index + 12.7));
-      euler.set(0, hash(index + 13.9) * Math.PI * 2, 0);
-      rotation.setFromEuler(euler);
-      scale.set(crackScale, crackScale, crackScale);
-      crackMatrices.push(new THREE.Matrix4().compose(position, rotation, scale));
-
       rockDelays[index] = config.ringDelays[ring];
       rockSeeds[index] = seed;
 
@@ -312,7 +281,6 @@ function createRockLayout(config: RockRippleVfxConfig): RockLayout {
   return {
     rockMatrices,
     dustMatrices,
-    crackMatrices,
     debrisMatrices,
     rockDelays,
     rockSeeds,
@@ -425,23 +393,6 @@ function createOutlineMaterial(config: RockRippleVfxConfig): THREE.ShaderMateria
     transparent: false,
     depthWrite: true,
     depthTest: true,
-  });
-}
-
-function createGroundCrackMaterial(config: RockRippleVfxConfig, cracks: THREE.Texture): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uAge: { value: 0 },
-      uLifetime: { value: config.groundCrackLifetime },
-      uCracks: { value: cracks },
-      uColor: { value: new THREE.Color(config.groundCrackColor) },
-    },
-    vertexShader: groundCrackVertexShader,
-    fragmentShader: groundCrackFragmentShader,
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    blending: THREE.NormalBlending,
   });
 }
 
@@ -563,52 +514,6 @@ const outlineFragmentShader = `
       discard;
     }
     gl_FragColor = vec4(uOutlineColor, 1.0);
-  }
-`;
-
-const groundCrackVertexShader = `
-  uniform float uAge;
-  uniform float uLifetime;
-
-  attribute float instanceDelay;
-  attribute float instanceSeed;
-
-  varying vec2 vUv;
-  varying float vLife;
-  varying float vVisible;
-
-  void main() {
-    float localAge = uAge - instanceDelay;
-    float life = clamp(localAge / max(uLifetime, 0.001), 0.0, 1.0);
-    float scale = mix(0.48, 1.0, smoothstep(0.0, 0.09, life));
-    vec3 localPosition = position * scale;
-    vec4 instancePosition = instanceMatrix * vec4(localPosition, 1.0);
-    instancePosition.y += 0.022 + instanceSeed * 0.002;
-    vUv = uv;
-    vLife = life;
-    vVisible = step(0.0, localAge) * (1.0 - step(0.999, life));
-    gl_Position = projectionMatrix * viewMatrix * modelMatrix * instancePosition;
-  }
-`;
-
-const groundCrackFragmentShader = `
-  uniform sampler2D uCracks;
-  uniform vec3 uColor;
-
-  varying vec2 vUv;
-  varying float vLife;
-  varying float vVisible;
-
-  void main() {
-    float radius = length(vUv - 0.5) * 2.0;
-    float crackMask = smoothstep(0.2, 0.56, texture2D(uCracks, vUv).r);
-    crackMask *= smoothstep(0.12, 0.28, radius);
-    float fade = 1.0 - smoothstep(0.72, 1.0, vLife);
-    float alpha = crackMask * fade * 0.72;
-    if (vVisible < 0.5 || alpha < 0.025) {
-      discard;
-    }
-    gl_FragColor = vec4(uColor, alpha);
   }
 `;
 

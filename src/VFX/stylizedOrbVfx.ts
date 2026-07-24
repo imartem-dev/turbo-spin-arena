@@ -111,7 +111,7 @@ const coreFragmentShader = /* glsl */ `
     float radial = texture2D(uGlowMap, vUv).a;
     float distanceFromCenter = length(vUv - 0.5) * 2.0;
     float whiteCore = 1.0 - smoothstep(0.0, 0.24, distanceFromCenter);
-    vec3 color = mix(uColor * 1.25, vec3(1.0) * uIntensity, whiteCore);
+    vec3 color = mix(uColor * 1.25, vec3(1.0) * uIntensity, whiteCore * 0.28);
     vec2 centeredUv = (vUv - 0.5) * 2.0;
     vec2 plasmaUv = rotation2d(uTime * 0.7 + uPhase) * centeredUv;
     float firstFlow = fbm(plasmaUv * 2.1 + vec2(uTime * 0.13, -uTime * 0.09));
@@ -235,6 +235,7 @@ export class StylizedOrbVfx {
       uPhase: { value: index * 1.37 },
       uPulseAmount: { value: 0.03 },
     });
+    this.coreMaterial.blending = THREE.NormalBlending;
     this.sparkMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: index * 0.73 },

@@ -7,7 +7,6 @@ export type ElementalSkillSettings = {
   auraRadius: number;
   fireDamageMultiplier: number;
   fireKnockbackMultiplier: number;
-  frostSlowDuration: number;
   frostFreezeDuration: number;
   frostFragileDamageMultiplier: number;
   lightningChainRadius: number;
@@ -20,10 +19,9 @@ export type ElementalSkillSettings = {
 };
 
 export const defaultElementalSkillSettings: ElementalSkillSettings = {
-  auraRadius: 4,
+  auraRadius: 8,
   fireDamageMultiplier: 1.25,
   fireKnockbackMultiplier: 1.5,
-  frostSlowDuration: 3,
   frostFreezeDuration: 3,
   frostFragileDamageMultiplier: 2,
   lightningChainRadius: 5,
@@ -32,7 +30,7 @@ export const defaultElementalSkillSettings: ElementalSkillSettings = {
   lightningDamageStep: 100,
   earthDamage: 300,
   earthSecondPulseDelay: 3,
-  earthLaunchVelocity: 7,
+  earthLaunchVelocity: 14,
 };
 
 export type ElementalDirectDamageCommand<TSpinner extends CombatSpinnerState> = {
@@ -60,7 +58,6 @@ export type ElementalSkillResult<TSpinner extends CombatSpinnerState> = {
 };
 
 type FrostStatus = {
-  exposure: number;
   freezeTimeRemaining: number;
   visuallyFrozen: boolean;
 };
@@ -108,7 +105,6 @@ export function activateElementalSkill<TSpinner extends CombatSpinnerState>(
         continue;
       }
       const status = getFrostStatus(state, target);
-      status.exposure = 0;
       status.freezeTimeRemaining = settings.frostFreezeDuration;
       setFrozen(target, settings);
       if (!status.visuallyFrozen) {
@@ -143,6 +139,17 @@ export function updateElementalSkills<TSpinner extends CombatSpinnerState>(
       continue;
     }
 
+    const insideAura = iceAuraActive && isInsideAura(source, target, settings.auraRadius);
+    if (insideAura) {
+      status.freezeTimeRemaining = settings.frostFreezeDuration;
+      setFrozen(target, settings);
+      if (!status.visuallyFrozen) {
+        status.visuallyFrozen = true;
+        result.freezeCommands.push({ target, frozen: true });
+      }
+      continue;
+    }
+
     if (status.freezeTimeRemaining > 0) {
       status.freezeTimeRemaining = Math.max(0, status.freezeTimeRemaining - deltaTime);
       if (status.freezeTimeRemaining > 0) {
@@ -157,22 +164,9 @@ export function updateElementalSkills<TSpinner extends CombatSpinnerState>(
         result.freezeCommands.push({ target, frozen: false });
       }
     }
-
-    const insideAura = iceAuraActive && isInsideAura(source, target, settings.auraRadius);
-    const exposureStep = settings.frostSlowDuration > 0 ? deltaTime / settings.frostSlowDuration : 1;
-    status.exposure = THREE.MathUtils.clamp(status.exposure + (insideAura ? exposureStep : -exposureStep), 0, 1);
     target.incomingDamageMultiplier = 1;
-    target.elementalMoveSpeedMultiplier = 1 - status.exposure;
-
-    if (insideAura && status.exposure >= 1) {
-      status.exposure = 0;
-      status.freezeTimeRemaining = settings.frostFreezeDuration;
-      setFrozen(target, settings);
-      if (!status.visuallyFrozen) {
-        status.visuallyFrozen = true;
-        result.freezeCommands.push({ target, frozen: true });
-      }
-    }
+    target.elementalMoveSpeedMultiplier = 1;
+    target.elementalMovementLocked = false;
   }
 
   if (state.earthSecondPulseRemaining !== null) {
@@ -246,7 +240,7 @@ function getFrostStatus<TSpinner extends CombatSpinnerState>(
 ): FrostStatus {
   let status = state.frostStatusByTarget.get(target);
   if (!status) {
-    status = { exposure: 0, freezeTimeRemaining: 0, visuallyFrozen: false };
+    status = { freezeTimeRemaining: 0, visuallyFrozen: false };
     state.frostStatusByTarget.set(target, status);
   }
   return status;
@@ -257,7 +251,6 @@ function clearFrostStatus<TSpinner extends CombatSpinnerState>(
   status: FrostStatus,
   result: ElementalSkillResult<TSpinner>,
 ): void {
-  status.exposure = 0;
   status.freezeTimeRemaining = 0;
   target.incomingDamageMultiplier = 1;
   target.elementalMoveSpeedMultiplier = 1;
@@ -272,6 +265,7 @@ function setFrozen(target: CombatSpinnerState, settings: ElementalSkillSettings)
   target.incomingDamageMultiplier = settings.frostFragileDamageMultiplier;
   target.elementalMoveSpeedMultiplier = 0;
   target.elementalMovementLocked = true;
+  target.velocity.set(0, 0, 0);
 }
 
 function isInsideAura(source: CombatSpinnerState, target: CombatSpinnerState, radius: number): boolean {

@@ -20,6 +20,20 @@ Keep refactors surgical:
 - Preserve the current gameplay behavior unless the user explicitly asks to change it.
 - Run `npm run build` after code changes.
 
+# GitHub and Yandex Games Release Convention
+
+For this project, the user treats **"залей на Git"** and **"выпусти релиз Яндекс.Игр"** as equivalent requests for one complete release cycle. Do not require the user to ask for GitHub and Yandex release preparation separately.
+
+When either request is made:
+
+1. Inspect the working tree and stage all source code, assets, configuration, scripts, and documentation required to reproduce the game. Do not stage generated builds, dependency folders, runtime logs, PID files, local server output, credentials, or other temporary files. Update `.gitignore` surgically if newly encountered generated files need to be excluded.
+2. Run the relevant verification commands, including `npm run test` and `npm run build:yandex` when available. Fix failures that are within the requested release scope before committing; report genuine blockers.
+3. Choose the next Yandex Games version automatically using semantic versioning: first tagged release is `0.1.0`; a fixes-only release increments the patch version; a release with player-visible content or gameplay changes increments the minor version and resets patch to zero; use `1.0.0` only for an explicitly stated full release. Keep `package.json` version in sync with the release version.
+4. Create a clear release commit, create an annotated tag named `yandex-vX.Y.Z` with message `Yandex Games release X.Y.Z`, push the commit and tag to `origin`, then build the ZIP with `npm run package:yandex` when available.
+5. Report the Git commit, tag, and absolute path to the prepared ZIP. Preparing and pushing the ZIP is not the same as publishing it in the Yandex Games dashboard; upload or publication in that dashboard requires the user to explicitly request it.
+
+For a request that explicitly asks only for a non-release backup commit, follow that narrower request and do not create a version tag or Yandex package.
+
 # Runtime Performance Rules
 
 - Do not create Three.js `Geometry`, `BufferGeometry`, `Material`, `Texture`, `CanvasTexture`, `Sprite`, `Mesh`, `Line`, or `Canvas` during active gameplay unless explicitly approved.

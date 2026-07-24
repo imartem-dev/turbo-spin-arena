@@ -7,7 +7,7 @@
     "gust": true,
     "dust": true,
     "debris": false,
-    "arcs": true,
+    "arcs": false,
     "sand": true
   },
   "layers": {

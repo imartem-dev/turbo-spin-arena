@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:yandex": "npm run build:yandex && node scripts/serve-yandex-local.mjs",
     "build": "tsc && vite build",
+    "build:yandex": "tsc && vite build --mode yandex --outDir dist-yandex",
+    "package:yandex": "npm run build:yandex && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-yandex.ps1",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run"
   },

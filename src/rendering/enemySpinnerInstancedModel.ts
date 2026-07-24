@@ -3,38 +3,46 @@ import {
   createInstancedAnimeFillMaterial,
   isSpinnerPaintName,
   prepareSpinnerModel,
+  resolveSpinnerPaintSlot,
 } from "./animeSpinnerMaterial";
-import type { SpinnerModelAsset } from "./spinnerModelLoader";
+import type { SpinnerModelAsset, SpinnerModelAssetKey } from "./spinnerModelLoader";
 
 export type InstancedEnemySpinner = {
   spinGroup: THREE.Group;
   modelColor: string;
+  modelColors?: [string, string, string];
   modelTint: string | null;
+  renderVisible: boolean;
+  modelAssetKey?: SpinnerModelAssetKey;
 };
 
 type InstancedFill = {
   mesh: THREE.InstancedMesh;
   material: THREE.MeshBasicMaterial;
   paintable: boolean;
+  colorSlot: 0 | 1 | 2;
+};
+
+type ModelBatch = {
+  fills: InstancedFill[];
+  colorKeys: string[];
+  freezeCoverages: Float32Array;
+  freezeAttributes: THREE.InstancedBufferAttribute[];
 };
 
 export class EnemySpinnerInstancedModel {
   private readonly matrix = new THREE.Matrix4();
   private readonly color = new THREE.Color();
   private readonly hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-  private readonly colorKeys: string[] = [];
   private readonly freezeTargets = new WeakMap<InstancedEnemySpinner, boolean>();
-  private readonly freezeCoverages: Float32Array;
-  private readonly freezeAttributes: THREE.InstancedBufferAttribute[] = [];
   private readonly freezeMask: THREE.Texture;
   private readonly freezeDissolve: THREE.Texture;
-  private fills: InstancedFill[] = [];
+  private readonly batches = new Map<SpinnerModelAssetKey, ModelBatch>();
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly capacity: number,
   ) {
-    this.freezeCoverages = new Float32Array(capacity);
     const loader = new THREE.TextureLoader();
     const base = `${import.meta.env.BASE_URL}assets/vfx/freeze/`;
     this.freezeMask = loader.load(`${base}T_Noise_Wo14.webp`);
@@ -47,7 +55,13 @@ export class EnemySpinnerInstancedModel {
   }
 
   setModelSource(source: THREE.Group, asset: SpinnerModelAsset, radius: number): void {
-    this.disposeMeshes();
+    this.disposeBatch(asset.key);
+    const batch: ModelBatch = {
+      fills: [],
+      colorKeys: Array(this.capacity).fill(""),
+      freezeCoverages: new Float32Array(this.capacity),
+      freezeAttributes: [],
+    };
     const targetDiameter = radius * 1.65;
     const prepared = prepareSpinnerModel(source, asset.rotationX, targetDiameter);
     prepared.root.updateMatrixWorld(true);
@@ -57,21 +71,24 @@ export class EnemySpinnerInstancedModel {
       const geometry = child.geometry.clone();
       geometry.applyMatrix4(child.matrixWorld);
       if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
-      const freezeAttribute = new THREE.InstancedBufferAttribute(this.freezeCoverages, 1);
+      const freezeAttribute = new THREE.InstancedBufferAttribute(batch.freezeCoverages, 1);
       freezeAttribute.setUsage(THREE.DynamicDrawUsage);
       geometry.setAttribute("instanceFreeze", freezeAttribute);
-      this.freezeAttributes.push(freezeAttribute);
+      batch.freezeAttributes.push(freezeAttribute);
 
       const sourceMaterials = Array.isArray(child.material) ? child.material : [child.material];
       const paintable = !prepared.hasPaintMarkers
         || isSpinnerPaintName(child.name)
         || sourceMaterials.some((material) => isSpinnerPaintName(material.name));
+      const colorSlot = resolveSpinnerPaintSlot(sourceMaterials[0].name)
+        ?? resolveSpinnerPaintSlot(child.name)
+        ?? 0;
       const material = createInstancedAnimeFillMaterial(sourceMaterials[0], paintable, {
         freezeMask: this.freezeMask,
         freezeDissolve: this.freezeDissolve,
       });
       const mesh = new THREE.InstancedMesh(geometry, material, this.capacity);
-      mesh.name = `Enemy Spinner Instanced ${this.fills.length + 1}`;
+      mesh.name = `Enemy Spinner ${asset.key} Instanced ${batch.fills.length + 1}`;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       mesh.renderOrder = 1;
@@ -82,12 +99,10 @@ export class EnemySpinnerInstancedModel {
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      this.fills.push({ mesh, material, paintable });
+      batch.fills.push({ mesh, material, paintable, colorSlot });
       this.scene.add(mesh);
     });
-
-    this.colorKeys.length = this.capacity;
-    this.colorKeys.fill("");
+    this.batches.set(asset.key, batch);
     prepared.root.traverse((object) => {
       if (object instanceof THREE.Mesh) object.geometry.dispose();
     });
@@ -98,52 +113,58 @@ export class EnemySpinnerInstancedModel {
   }
 
   getOutlineTargets(): readonly THREE.Object3D[] {
-    return this.fills.map((fill) => fill.mesh);
+    return [...this.batches.values()].flatMap((batch) => batch.fills.map((fill) => fill.mesh));
   }
 
   sync(spinners: InstancedEnemySpinner[], deltaTime = 0): void {
-    if (this.fills.length === 0) return;
-
-    const count = Math.min(spinners.length, this.capacity);
-    let colorNeedsUpdate = false;
-    for (let index = 0; index < count; index += 1) {
-      const spinner = spinners[index];
-      spinner.spinGroup.updateWorldMatrix(true, false);
-      this.matrix.copy(spinner.spinGroup.matrixWorld);
-      const colorKey = spinner.modelTint ?? spinner.modelColor;
-      const freezeTarget = this.freezeTargets.get(spinner) === true ? 1 : 0;
-      const freezeDuration = freezeTarget > this.freezeCoverages[index] ? 0.45 : 0.75;
-      const freezeStep = freezeDuration > 0 ? deltaTime / freezeDuration : 1;
-      this.freezeCoverages[index] = THREE.MathUtils.clamp(
-        this.freezeCoverages[index] + Math.sign(freezeTarget - this.freezeCoverages[index]) * freezeStep,
-        0,
-        1,
-      );
-
-      for (const { mesh } of this.fills) mesh.setMatrixAt(index, this.matrix);
-
-      if (this.colorKeys[index] !== colorKey) {
-        this.colorKeys[index] = colorKey;
-        this.color.set(colorKey);
-        for (const fill of this.fills) {
-          if (fill.paintable) fill.mesh.setColorAt(index, this.color);
+    for (const [assetKey, batch] of this.batches) {
+      const matching = spinners.filter((spinner) => (spinner.modelAssetKey ?? "spinner2") === assetKey);
+      const count = Math.min(matching.length, this.capacity);
+      let colorNeedsUpdate = false;
+      for (let index = 0; index < count; index += 1) {
+        const spinner = matching[index];
+        if (spinner.renderVisible) {
+          spinner.spinGroup.updateWorldMatrix(true, false);
+          this.matrix.copy(spinner.spinGroup.matrixWorld);
+        } else {
+          this.matrix.copy(this.hiddenMatrix);
         }
-        colorNeedsUpdate = true;
+        const colors = spinner.modelTint
+          ? [spinner.modelTint, spinner.modelTint, spinner.modelTint]
+          : spinner.modelColors ?? [spinner.modelColor, spinner.modelColor, spinner.modelColor];
+        const colorKey = colors.join("|");
+        const freezeTarget = this.freezeTargets.get(spinner) === true ? 1 : 0;
+        if (freezeTarget === 1) {
+          batch.freezeCoverages[index] = 1;
+        } else {
+          const thawStep = deltaTime / 0.75;
+          batch.freezeCoverages[index] = Math.max(0, batch.freezeCoverages[index] - thawStep);
+        }
+
+        for (const { mesh } of batch.fills) mesh.setMatrixAt(index, this.matrix);
+
+        if (batch.colorKeys[index] !== colorKey) {
+          batch.colorKeys[index] = colorKey;
+          for (const fill of batch.fills) {
+            if (fill.paintable) fill.mesh.setColorAt(index, this.color.set(colors[fill.colorSlot]));
+          }
+          colorNeedsUpdate = true;
+        }
       }
-    }
 
-    for (let index = count; index < this.capacity; index += 1) {
-      for (const { mesh } of this.fills) mesh.setMatrixAt(index, this.hiddenMatrix);
-      this.colorKeys[index] = "";
-      this.freezeCoverages[index] = 0;
-    }
+      for (let index = count; index < this.capacity; index += 1) {
+        for (const { mesh } of batch.fills) mesh.setMatrixAt(index, this.hiddenMatrix);
+        batch.colorKeys[index] = "";
+        batch.freezeCoverages[index] = 0;
+      }
 
-    for (const fill of this.fills) {
-      fill.mesh.count = count;
-      fill.mesh.instanceMatrix.needsUpdate = true;
-      if (colorNeedsUpdate && fill.mesh.instanceColor) fill.mesh.instanceColor.needsUpdate = true;
+      for (const fill of batch.fills) {
+        fill.mesh.count = count;
+        fill.mesh.instanceMatrix.needsUpdate = true;
+        if (colorNeedsUpdate && fill.mesh.instanceColor) fill.mesh.instanceColor.needsUpdate = true;
+      }
+      for (const attribute of batch.freezeAttributes) attribute.needsUpdate = true;
     }
-    for (const attribute of this.freezeAttributes) attribute.needsUpdate = true;
   }
 
   dispose(): void {
@@ -153,14 +174,17 @@ export class EnemySpinnerInstancedModel {
   }
 
   private disposeMeshes(): void {
-    for (const fill of this.fills) {
+    for (const key of [...this.batches.keys()]) this.disposeBatch(key);
+  }
+
+  private disposeBatch(key: SpinnerModelAssetKey): void {
+    const batch = this.batches.get(key);
+    if (!batch) return;
+    for (const fill of batch.fills) {
       this.scene.remove(fill.mesh);
       fill.mesh.geometry.dispose();
       fill.material.dispose();
     }
-    this.fills = [];
-    this.freezeAttributes.length = 0;
-    this.colorKeys.length = 0;
-    this.freezeCoverages.fill(0);
+    this.batches.delete(key);
   }
 }

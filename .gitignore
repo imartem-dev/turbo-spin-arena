@@ -1,5 +1,12 @@
 node_modules/
 dist/
+dist-yandex/
 .playwright-cli/
 output/
+artifacts/
+*-yandex.zip
+*.log
+*.pid
+*.stderr.path
+*.stdout.path
 .vite-dev.*.log

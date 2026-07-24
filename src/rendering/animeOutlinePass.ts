@@ -23,14 +23,52 @@ export type AnimeOutlinePassOptions = {
   outerOpacity?: number;
 };
 
+export type AnimeOutlineParameters = {
+  outerWidth: number;
+  outerOpacity: number;
+  innerWidth: number;
+  normalThreshold: number;
+  innerOpacity: number;
+};
+
+export const animeOutlineDefaults: Readonly<AnimeOutlineParameters> = Object.freeze({
+  outerWidth: 3,
+  outerOpacity: 1,
+  innerWidth: 0.5,
+  normalThreshold: 0.1,
+  innerOpacity: 0.8,
+});
+
+type AnimeOutlineParameterKey = keyof AnimeOutlineParameters;
+type AnimeOutlinePassState = {
+  options: Required<AnimeOutlinePassOptions>;
+  compositeMaterial: THREE.ShaderMaterial;
+};
+
+const animeOutlineParameters: AnimeOutlineParameters = { ...animeOutlineDefaults };
+const animeOutlinePassStates = new Set<AnimeOutlinePassState>();
+
+export function getAnimeOutlineParameters(): AnimeOutlineParameters {
+  return { ...animeOutlineParameters };
+}
+
+export function setAnimeOutlineParameters(values: Partial<AnimeOutlineParameters>): void {
+  for (const key of Object.keys(values) as AnimeOutlineParameterKey[]) {
+    const value = values[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    animeOutlineParameters[key] = value;
+    for (const state of animeOutlinePassStates) applyOutlineParameter(state, key, value);
+  }
+}
+
+export function resetAnimeOutlineParameters(): void {
+  setAnimeOutlineParameters(animeOutlineDefaults);
+}
+
 const outlineColor = new THREE.Color("#06070a");
 const defaultOutlineOptions = {
-  outerWidth: 3,
-  innerWidth: 1,
-  normalThreshold: 0.52,
+  ...animeOutlineDefaults,
   depthThreshold: 0.012,
-  innerOpacity: 0.68,
-  outerOpacity: 1,
 } satisfies Required<AnimeOutlinePassOptions>;
 
 export class AnimeOutlinePass {
@@ -56,11 +94,15 @@ export class AnimeOutlinePass {
   private width = 1;
   private height = 1;
   private readonly options: Required<AnimeOutlinePassOptions>;
+  private readonly parameterState: AnimeOutlinePassState;
 
-  constructor(options: AnimeOutlinePassOptions | number = defaultOutlineOptions) {
+  constructor(options: AnimeOutlinePassOptions | number = animeOutlineParameters) {
     this.options = typeof options === "number"
-      ? { ...defaultOutlineOptions, outerWidth: options }
-      : { ...defaultOutlineOptions, ...options };
+      ? { ...defaultOutlineOptions, ...animeOutlineParameters, outerWidth: options }
+      : { ...defaultOutlineOptions, ...animeOutlineParameters, ...options };
+    this.parameterState = { options: this.options, compositeMaterial: this.compositeMaterial };
+    animeOutlinePassStates.add(this.parameterState);
+    applyOutlineParameters(this.parameterState, this.options);
     this.maskTarget.depthTexture = this.maskDepthTexture;
     this.maskTarget.texture.name = "Anime Outline Normal Mask";
     this.maskTarget.texture.colorSpace = THREE.NoColorSpace;
@@ -152,6 +194,7 @@ export class AnimeOutlinePass {
   }
 
   dispose(): void {
+    animeOutlinePassStates.delete(this.parameterState);
     this.maskTarget.dispose();
     this.maskDepthTexture.dispose();
     this.maskMaterial.dispose();
@@ -205,6 +248,31 @@ export class AnimeOutlinePass {
   private restoreVisibility(records: Array<{ object: THREE.Object3D; visible: boolean }>): void {
     for (const { object, visible } of records) object.visible = visible;
   }
+}
+
+function applyOutlineParameters(
+  state: AnimeOutlinePassState,
+  values: AnimeOutlineParameters,
+): void {
+  for (const key of Object.keys(animeOutlineDefaults) as AnimeOutlineParameterKey[]) {
+    applyOutlineParameter(state, key, values[key]);
+  }
+}
+
+function applyOutlineParameter(
+  state: AnimeOutlinePassState,
+  key: AnimeOutlineParameterKey,
+  value: number,
+): void {
+  state.options[key] = value;
+  const uniformName = ({
+    outerWidth: "uOuterWidth",
+    outerOpacity: "uOuterOpacity",
+    innerWidth: "uInnerWidth",
+    normalThreshold: "uNormalThreshold",
+    innerOpacity: "uInnerOpacity",
+  } satisfies Record<AnimeOutlineParameterKey, string>)[key];
+  state.compositeMaterial.uniforms[uniformName].value = value;
 }
 
 function createCompositeMaterial(): THREE.ShaderMaterial {

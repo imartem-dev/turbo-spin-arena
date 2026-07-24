@@ -15,6 +15,7 @@ export type ArenaDefinition = {
   clampPoint(position: THREE.Vector3, margin?: number): THREE.Vector3;
   getBoundaryPoint(position: THREE.Vector3): THREE.Vector3;
   createSceneObjects(): THREE.Group;
+  updateVisuals?(deltaTime: number, elapsedTime: number, reducedMotion: boolean): void;
 };
 
 export type ArenaTextureSettings = {
@@ -345,7 +346,6 @@ function applyArenaTextureSettings(): void {
   bowlSurfaceTexture.offset.set(arenaTextureSettings.offsetX, arenaTextureSettings.offsetY);
   bowlSurfaceTexture.repeat.set(safeScale, safeScale);
   bowlSurfaceTexture.rotation = arenaTextureSettings.rotation;
-  bowlSurfaceTexture.needsUpdate = true;
 }
 
 function applyTileTextureSettings(): void {
@@ -358,7 +358,6 @@ function applyTileTextureSettings(): void {
   tileSurfaceTexture.offset.set(tileTextureSettings.offsetX, tileTextureSettings.offsetY);
   tileSurfaceTexture.repeat.set(safeScale, safeScale);
   tileSurfaceTexture.rotation = tileTextureSettings.rotation;
-  tileSurfaceTexture.needsUpdate = true;
 }
 
 function applyBackdropTextureSettings(): void {
@@ -367,7 +366,6 @@ function applyBackdropTextureSettings(): void {
   backdropTexture.offset.set(backdropTextureSettings.offsetX, backdropTextureSettings.offsetY);
   backdropTexture.repeat.set(safeScale, safeScale);
   backdropTexture.rotation = backdropTextureSettings.rotation;
-  backdropTexture.needsUpdate = true;
 }
 
 function createArenaRim(): THREE.Group {

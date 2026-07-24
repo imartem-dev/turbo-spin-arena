@@ -1,16 +1,19 @@
 export type GameMode = "duel" | "deathmatch";
-export type MatchOutcome = "victory" | "defeat" | "placed";
+export type MatchOutcome = "victory" | "defeat";
 export type MatchResult = {
   mode: GameMode;
   outcome: MatchOutcome;
-  place: number;
-  kills: number;
   partsEarned: number;
   bonusClaimed: boolean;
 };
 
-export function calculateMatchReward(mode: GameMode, won: boolean, kills: number, place: number): number {
-  if (mode === "duel") return 20 + (won ? 30 : 0);
-  const placement = place === 1 ? 60 : place <= 3 ? 30 : 0;
-  return 20 + Math.max(0, kills) * 10 + placement;
+export function calculateMatchReward(mode: GameMode, won: boolean, defeatedBeforePlayer: number): number {
+  if (mode === "duel") return won ? 250 : 100;
+  const rank = 10 - Math.min(9, Math.max(0, defeatedBeforePlayer));
+  if (rank === 1) return 500;
+  if (rank === 2) return 350;
+  if (rank === 3) return 250;
+  if (rank <= 5) return 180;
+  if (rank <= 8) return 120;
+  return 80;
 }

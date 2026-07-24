@@ -1,5 +1,6 @@
 import type { TranslationKey } from "../i18n";
-import type { CatalogCategory, CatalogItem, PaymentOption } from "../progression/catalog";
+import type { PlatformProduct } from "../platform/platformService";
+import { elementCatalog, type CatalogCategory, type CatalogItem, type PaymentOption } from "../progression/catalog";
 import {
   getUpgradePrice,
   getUpgradeValue,
@@ -7,7 +8,7 @@ import {
   type UpgradeId,
 } from "../progression/playerProfile";
 import type { SpinnerElement } from "../simulation/elementalSkills";
-import type { GameMode, MatchResult } from "../progression/matchProgression";
+import type { GameMode } from "../progression/matchProgression";
 
 const publicAssetBaseUrl = `${import.meta.env.BASE_URL}assets/`;
 
@@ -22,7 +23,7 @@ export type CatalogCardState =
   | "insufficient";
 
 export type WorkshopPreviewSelection = Partial<Record<CatalogCategory, string>>;
-export type WorkshopCategory = "element" | CatalogCategory;
+export type WorkshopCategory = CatalogCategory;
 
 export type CatalogCardModel = {
   state: CatalogCardState;
@@ -91,7 +92,7 @@ export class GameUiController {
     this.setScreenVisibility(false, false, false);
     document.body.classList.remove("workshop-open", "result-open");
     document.body.classList.add("match-started");
-    document.querySelector<HTMLElement>("[data-compact-leaderboard]")?.toggleAttribute("hidden", mode !== "deathmatch");
+    document.querySelector<HTMLElement>("[data-deathmatch-alive]")?.toggleAttribute("hidden", mode !== "deathmatch");
   }
 
   showResult(): void {
@@ -101,7 +102,15 @@ export class GameUiController {
   }
 
   setBusy(disabled: boolean): void {
-    for (const selector of ["[data-start-match]", "[data-workshop-play]", "[data-result-replay]"]) {
+    for (const selector of [
+      "[data-start-match]",
+      "[data-open-workshop]",
+      "[data-close-workshop]",
+      "[data-workshop-play]",
+      "[data-result-workshop]",
+      "[data-result-replay]",
+      "[data-result-menu]",
+    ]) {
       const button = document.querySelector<HTMLButtonElement>(selector);
       button?.toggleAttribute("disabled", disabled);
       if (selector === "[data-start-match]") button?.classList.toggle("is-launching", disabled);
@@ -133,12 +142,14 @@ type WorkshopStyleOptions = {
   items: CatalogItem[];
   previewSelection: WorkshopPreviewSelection;
   elements: readonly SpinnerElement[];
+  products?: ReadonlyMap<string, PlatformProduct>;
   activeMaterialSlot: 0 | 1 | 2;
   activeCategory: WorkshopCategory;
   t: Translate;
   onSelectCategory: (category: WorkshopCategory) => void;
   onSelectElement: (element: SpinnerElement) => void;
   onSelectMaterialSlot: (slot: 0 | 1 | 2) => void;
+  onSelectAuraColor: (item: CatalogItem) => void;
   onPreview: (item: CatalogItem) => void;
   onEquip: (item: CatalogItem) => void;
   onBuy: (item: CatalogItem, payment: PaymentOption) => void;
@@ -153,6 +164,7 @@ type WorkshopUpgradeOptions = {
 };
 
 const categoryLabelKeys: Record<CatalogCategory, TranslationKey> = {
+  element: "workshop.elements",
   model: "workshop.models",
   color: "workshop.colors",
   trail: "workshop.trails",
@@ -162,6 +174,7 @@ const upgradeIds: readonly UpgradeId[] = ["maxRpm", "damage", "dash", "ultimate"
 const baseMaxRpmDisplayValue = 6000;
 
 export function getEquippedCatalogId(profile: PlayerProfile, category: CatalogCategory): string {
+  if (category === "element") return `element_${profile.selectedElement}`;
   if (category === "model") return profile.selectedModel;
   if (category === "color") return profile.selectedMaterialColors[0];
   if (category === "trail") return profile.selectedTrail;
@@ -209,13 +222,6 @@ export function deriveUpgradeCardModel(profile: PlayerProfile, id: UpgradeId): U
   };
 }
 
-export function getResultStatRows(result: MatchResult, t: Translate): string[] {
-  if (result.mode === "deathmatch") {
-    return [`${t("result.place")}: ${result.place}`, `${t("result.kills")}: ${result.kills}`];
-  }
-  return [`${t("result.kills")}: ${result.kills}`];
-}
-
 export function renderWorkshopStyle(options: WorkshopStyleOptions): void {
   options.root.replaceChildren();
   const layout = document.createElement("div");
@@ -229,9 +235,9 @@ export function renderWorkshopStyle(options: WorkshopStyleOptions): void {
   const content = document.createElement("div");
   content.className = `workshop-category-content category-${options.activeCategory}`;
   if (options.activeCategory === "element") content.append(createElementContent(options));
-  else if (options.activeCategory === "model" || options.activeCategory === "aura") {
-    content.append(createCatalogGrid(options.activeCategory, options));
-  } else if (options.activeCategory === "color") content.append(createMaterialContent(options));
+  else if (options.activeCategory === "model") content.append(createCatalogGrid(options.activeCategory, options));
+  else if (options.activeCategory === "aura") content.append(createAuraContent(options));
+  else if (options.activeCategory === "color") content.append(createMaterialContent(options));
   else content.append(createTrailContent(options));
   layout.append(slots, content);
   options.root.append(layout);
@@ -282,8 +288,8 @@ export function renderWorkshopUpgrades(options: WorkshopUpgradeOptions): void {
 
 export function createPartsIcon(): HTMLImageElement {
   const image = document.createElement("img");
-  image.className = "parts-icon";
-  image.src = `${publicAssetBaseUrl}ui/main-menu/icons/parts-token.webp`;
+  image.className = "parts-icon workshop-parts-icon";
+  image.src = `${publicAssetBaseUrl}ui/shared/icon-currency.webp`;
   image.alt = "";
   image.setAttribute("aria-hidden", "true");
   return image;
@@ -302,20 +308,26 @@ function createElementContent(options: WorkshopStyleOptions): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "workshop-card-grid element-grid";
   for (const element of options.elements) {
+    const item = elementCatalog.find((candidate) => candidate.id === `element_${element}`)!;
     const selected = options.profile.selectedElement === element;
+    const owned = options.profile.ownedItems.includes(item.id);
     const button = document.createElement("button");
     button.type = "button";
     button.className = `workshop-large-card element-card element-tile element-${element}${selected ? " selected" : ""}`;
     button.setAttribute("aria-label", options.t(`element.${element}`));
     button.setAttribute("aria-pressed", String(selected));
-    button.addEventListener("click", () => options.onSelectElement(element));
+    button.addEventListener("click", () => owned ? options.onSelectElement(element) : options.onPreview(item));
     if (selected) button.append(createStateIcon("check"));
-    grid.append(button);
+    const wrapper = document.createElement("div");
+    wrapper.className = "element-item";
+    wrapper.append(button);
+    if (!owned) wrapper.append(createPalettePriceArea(item, false, options));
+    grid.append(wrapper);
   }
   return grid;
 }
 
-function createCatalogGrid(category: "model" | "aura", options: WorkshopStyleOptions): HTMLElement {
+function createCatalogGrid(category: "model", options: WorkshopStyleOptions): HTMLElement {
   const viewport = document.createElement("div");
   viewport.className = "workshop-category-scroll";
   viewport.tabIndex = 0;
@@ -327,6 +339,133 @@ function createCatalogGrid(category: "model" | "aura", options: WorkshopStyleOpt
   }
   viewport.append(grid);
   return viewport;
+}
+
+export function renderWorkshopShop(root: HTMLElement, products: ReadonlyMap<string, PlatformProduct>, t: Translate, onBuy: (productId: string) => void): void {
+  root.replaceChildren();
+  const grid = document.createElement("div");
+  grid.className = "workshop-shop-grid";
+  for (const [titleKey, productId, imageName, includesNoAdsBonus] of [
+    ["offer.parts7500", "parts_7500", "donat1.webp", false],
+    ["offer.parts21000", "parts_21000", "donat2.webp", false],
+    ["offer.parts21000Aura3", "parts_21000_aura_3", "donat3.webp", false],
+    ["offer.parts50000", "parts_50000", "donat4.webp", false],
+    ["offer.noAds", "no_ads", "donat5.webp", true],
+  ] as const) {
+    const product = products.get(productId);
+    const card = document.createElement("article");
+    card.className = "workshop-shop-card";
+    const preview = document.createElement("div");
+    preview.className = "workshop-shop-preview";
+    preview.append(Object.assign(document.createElement("img"), {
+      src: `${publicAssetBaseUrl}ui/workshop/offers/${imageName}`,
+      alt: t(titleKey),
+    }));
+    const title = document.createElement("strong");
+    title.className = "workshop-shop-title";
+    title.classList.toggle("has-no-ads-bonus", includesNoAdsBonus);
+    appendOfferTitle(title, t(titleKey), includesNoAdsBonus ? t("offer.parts7500") : undefined);
+    const priceArea = document.createElement("div");
+    priceArea.className = "workshop-card-price-area";
+    const buy = product
+      ? createPremiumButton(product)
+      : Object.assign(document.createElement("button"), {
+        type: "button",
+        className: "ui-button premium-button price-button",
+        textContent: t("workshop.unavailable"),
+      });
+    buy.classList.add("price-button");
+    buy.disabled = !product;
+    buy.setAttribute("aria-label", `${t(titleKey)}: ${product?.price ?? t("workshop.unavailable")}`);
+    buy.addEventListener("click", () => onBuy(productId));
+    priceArea.append(buy);
+    card.append(preview, title, priceArea);
+    grid.append(card);
+  }
+  root.append(grid);
+}
+
+function appendOfferTitle(title: HTMLElement, label: string, noAdsBonus: string | undefined): void {
+  const content = document.createElement("span");
+  content.className = "workshop-shop-title-content";
+  if (noAdsBonus !== undefined) {
+    content.append(createOfferTitleText(label), createOfferTitleText("+"), createOfferPartsAmount(noAdsBonus));
+    title.append(content);
+    return;
+  }
+
+  const amount = label.match(/^(\s*[\d\s,.\u00a0]+)(.*)$/);
+  if (!amount) {
+    content.append(createOfferTitleText(label));
+    title.append(content);
+    return;
+  }
+  content.append(createOfferPartsAmount(amount[1].trim()));
+  if (amount[2].trim()) content.append(createOfferTitleText(amount[2].trim()));
+  title.append(content);
+}
+
+function createOfferTitleText(text: string): HTMLElement {
+  return Object.assign(document.createElement("span"), { className: "workshop-shop-title-copy", textContent: text });
+}
+
+function createOfferPartsAmount(amount: string): HTMLElement {
+  const wrapper = document.createElement("span");
+  wrapper.className = "offer-parts-amount";
+  wrapper.append(createPartsIcon(), Object.assign(document.createElement("span"), { textContent: amount }));
+  return wrapper;
+}
+
+function createAuraContent(options: WorkshopStyleOptions): HTMLElement {
+  const editor = document.createElement("div");
+  editor.className = "material-editor aura-editor";
+  const slots = document.createElement("div");
+  slots.className = "material-slots aura-slots";
+  const previewedAura = options.previewSelection.aura ?? options.profile.selectedAura;
+
+  for (const item of options.items.filter((candidate) => candidate.category === "aura")) {
+    const model = deriveCatalogCardModel(options.profile, item, previewedAura);
+    const wrapper = document.createElement("div");
+    wrapper.className = `aura-style-item state-${model.state}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `material-slot aura-style-slot${previewedAura === item.id ? " active" : ""}`;
+    button.setAttribute("aria-label", options.t(item.labelKey as TranslationKey));
+    button.setAttribute("aria-pressed", String(previewedAura === item.id));
+    const preview = document.createElement("span");
+    preview.className = "workshop-item-webgl-preview aura-style-preview";
+    preview.dataset.workshopWebglKind = "aura-style";
+    preview.dataset.itemId = item.id;
+    preview.dataset.modelId = options.profile.selectedModel;
+    preview.dataset.active = String(previewedAura === item.id);
+    button.append(preview);
+    if (model.equipped) button.append(createStateIcon("check"));
+    button.addEventListener("click", () => model.owned ? options.onEquip(item) : options.onPreview(item));
+    wrapper.append(button);
+    if (!model.owned) wrapper.append(createPalettePriceArea(item, false, options));
+    slots.append(wrapper);
+  }
+
+  const palette = document.createElement("div");
+  palette.className = "material-palette aura-palette";
+  for (const item of options.items.filter((candidate) => candidate.category === "color")) {
+    const owned = options.profile.ownedItems.includes(item.id);
+    const selected = options.profile.selectedAuraColor === item.id;
+    const wrapper = document.createElement("div");
+    wrapper.className = "palette-item";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `palette-swatch${selected ? " selected" : ""}`;
+    button.style.setProperty("--swatch-color", item.color ?? "#fff");
+    button.setAttribute("aria-label", options.t(item.labelKey as TranslationKey));
+    button.setAttribute("aria-pressed", String(selected));
+    button.addEventListener("click", () => owned ? options.onSelectAuraColor(item) : options.onPreview(item));
+    if (selected) button.append(createStateIcon("check"));
+    wrapper.append(button, createPalettePriceArea(item, owned, options));
+    palette.append(wrapper);
+  }
+  editor.append(slots, palette);
+  return editor;
 }
 
 function createMaterialContent(options: WorkshopStyleOptions): HTMLElement {
@@ -379,7 +518,9 @@ function createTrailContent(options: WorkshopStyleOptions): HTMLElement {
   palette.className = "material-palette trail-palette";
   for (const item of options.items.filter((candidate) => candidate.category === "trail")) {
     const selected = options.profile.selectedTrail === item.id;
-    const owned = options.profile.ownedItems.includes(item.id);
+    const colorId = `color_${item.id.slice("trail_".length)}`;
+    const owned = options.profile.ownedItems.includes(colorId);
+    const colorItem = options.items.find((candidate) => candidate.id === colorId);
     const wrapper = document.createElement("div");
     wrapper.className = "palette-item";
     const button = document.createElement("button");
@@ -390,7 +531,7 @@ function createTrailContent(options: WorkshopStyleOptions): HTMLElement {
     button.setAttribute("aria-pressed", String(selected));
     button.addEventListener("click", () => owned ? options.onEquip(item) : options.onPreview(item));
     if (selected) button.append(createStateIcon("check"));
-    wrapper.append(button, createPalettePriceArea(item, owned, options));
+    wrapper.append(button, colorItem ? createPalettePriceArea(colorItem, owned, options) : document.createElement("div"));
     palette.append(wrapper);
   }
   return palette;
@@ -410,16 +551,23 @@ function createCategorySlot(category: WorkshopCategory, options: WorkshopStyleOp
   } else if (category === "model" || category === "aura") {
     const preview = document.createElement("span");
     preview.className = "workshop-item-webgl-preview slot-webgl-preview";
-    preview.dataset.workshopWebglKind = category === "model" ? "model-slot" : "aura-slot";
+    preview.dataset.workshopWebglKind = category === "model" ? "model-slot" : "aura-style";
     preview.dataset.itemId = category === "model" ? options.profile.selectedModel : options.profile.selectedAura;
-    preview.dataset.active = "false";
+    if (category === "aura") {
+      preview.dataset.modelId = options.profile.selectedModel;
+      preview.dataset.active = "true";
+    } else {
+      preview.dataset.active = "false";
+    }
     button.append(preview);
   } else if (category === "trail") {
     const trail = options.items.find((item) => item.id === options.profile.selectedTrail);
-    const icon = document.createElement("span");
-    icon.className = "slot-trail-icon";
-    icon.style.setProperty("--swatch-color", trail?.color ?? "#fff");
-    button.append(icon);
+    const preview = document.createElement("span");
+    preview.className = "workshop-item-webgl-preview slot-webgl-preview slot-trail-preview";
+    preview.dataset.workshopWebglKind = "trail-slot";
+    preview.dataset.itemId = trail?.id ?? "trail_default";
+    preview.dataset.trailColor = trail?.color ?? "#fff";
+    button.append(preview);
   } else {
     const image = document.createElement("img");
     image.src = `${publicAssetBaseUrl}ui/workshop/icons/color.webp`;
@@ -434,9 +582,11 @@ function createPalettePriceArea(item: CatalogItem, owned: boolean, options: Work
   const area = document.createElement("div");
   area.className = "palette-price-area";
   if (owned) return area;
-  const payment = item.paymentOptions[0];
+  const payment = getAvailablePayments(item, options)[0];
   if (!payment) return area;
-  const buy = payment.kind === "parts" ? createPartsButton(payment.amount, options.t) : createPremiumButton(options.t);
+  const buy = payment.kind === "parts"
+    ? createPartsButton(payment.amount, options.t)
+    : createPremiumButton(options.products!.get(payment.productId)!);
   buy.classList.add("palette-price");
   if (payment.kind === "parts") buy.disabled = options.profile.parts < payment.amount;
   buy.addEventListener("click", () => options.onBuy(item, payment));
@@ -475,9 +625,12 @@ function createWorkshopCatalogTile(item: CatalogItem, options: WorkshopStyleOpti
   const priceArea = document.createElement("div");
   priceArea.className = "workshop-card-price-area";
   if (!model.owned && !model.unavailable) {
-    const payment = item.paymentOptions.find((candidate) => candidate.kind === "parts") ?? item.paymentOptions[0];
+    const availablePayments = getAvailablePayments(item, options);
+    const payment = availablePayments.find((candidate) => candidate.kind === "parts") ?? availablePayments[0];
     if (payment) {
-      const buy = payment.kind === "parts" ? createPartsButton(payment.amount, options.t) : createPremiumButton(options.t);
+      const buy = payment.kind === "parts"
+        ? createPartsButton(payment.amount, options.t)
+        : createPremiumButton(options.products!.get(payment.productId)!);
       if (payment.kind === "parts" && options.profile.parts < payment.amount) buy.disabled = true;
       buy.addEventListener("click", () => options.onBuy(item, payment));
       priceArea.append(buy);
@@ -492,14 +645,20 @@ function createWorkshopArrow(direction: "previous" | "next", label: string): HTM
   button.type = "button";
   button.className = `workshop-arrow ${direction}`;
   button.setAttribute("aria-label", label);
-  const image = document.createElement("img");
-  image.src = `${publicAssetBaseUrl}ui/workshop/icons/${direction}.webp`;
-  image.alt = "";
-  button.append(image);
+  const icon = document.createElement("span");
+  icon.className = `ui-atlas-icon icon-back${direction === "next" ? " icon-next" : ""}`;
+  icon.setAttribute("aria-hidden", "true");
+  button.append(icon);
   return button;
 }
 
-function createStateIcon(name: "check" | "lock"): HTMLImageElement {
+function createStateIcon(name: "check" | "lock"): HTMLElement {
+  if (name === "check") {
+    const icon = document.createElement("span");
+    icon.className = "workshop-state-icon check ui-atlas-icon icon-check";
+    icon.setAttribute("aria-hidden", "true");
+    return icon;
+  }
   const image = document.createElement("img");
   image.className = `workshop-state-icon ${name}`;
   image.src = `${publicAssetBaseUrl}ui/workshop/icons/${name}.webp`;
@@ -611,10 +770,10 @@ function createCatalogCard(item: CatalogItem, previewedId: string, options: Work
     });
     actions.append(equip);
   } else {
-    for (const payment of item.paymentOptions) {
+    for (const payment of getAvailablePayments(item, options)) {
       const button = payment.kind === "parts"
         ? createPartsButton(payment.amount, options.t)
-        : createPremiumButton(options.t);
+        : createPremiumButton(options.products!.get(payment.productId)!);
       if (payment.kind === "parts" && options.profile.parts < payment.amount) {
         button.disabled = true;
         button.title = options.t("workshop.insufficient");
@@ -642,12 +801,14 @@ function createOffersSection(options: WorkshopStyleOptions): HTMLElement {
     ["offer.parts500", "parts_500"],
     ["offer.parts3000", "parts_3000"],
   ] as const) {
+    const product = options.products?.get(productId);
+    if (!product) continue;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "offer-card";
     button.append(
       Object.assign(document.createElement("strong"), { textContent: options.t(titleKey) }),
-      Object.assign(document.createElement("span"), { textContent: options.t("workshop.premium") }),
+      Object.assign(document.createElement("span"), { textContent: product.price }),
     );
     button.addEventListener("click", () => options.onOffer(productId));
     offers.append(button);
@@ -769,12 +930,26 @@ function createArrowButton(direction: "previous" | "next", label: string): HTMLB
   return button;
 }
 
-function createPremiumButton(t: Translate): HTMLButtonElement {
+function createPremiumButton(product: PlatformProduct): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "ui-button premium-button";
-  button.textContent = t("workshop.yan");
+  if (product.currencyIconUrl) {
+    const icon = document.createElement("img");
+    icon.src = product.currencyIconUrl;
+    icon.alt = "";
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon);
+  }
+  button.append(Object.assign(document.createElement("span"), { textContent: product.price }));
+  button.setAttribute("aria-label", `${product.title}: ${product.price}`);
   return button;
+}
+
+function getAvailablePayments(item: CatalogItem, options: WorkshopStyleOptions): PaymentOption[] {
+  return item.paymentOptions.filter((payment) =>
+    payment.kind === "parts" || options.products?.has(payment.productId) === true,
+  );
 }
 
 function createCategoryGlyph(item: CatalogItem): HTMLElement {

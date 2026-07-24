@@ -1,0 +1,626 @@
+{
+    "_instructions":  "Translate only the values. Keep every key unchanged. Return the same JSON structure. Preserve placeholders, numbers, punctuation, and formatting tokens.",
+    "sourceLanguage":  "en",
+    "translations":  {
+                         "game.title":  {
+                                            "source":  "Turbo Spin Arena",
+                                            "translation":  ""
+                                        },
+                         "menu.mode":  {
+                                           "source":  "Mode",
+                                           "translation":  ""
+                                       },
+                         "mode.multiplayer":  {
+                                                  "source":  "Multiplayer",
+                                                  "translation":  ""
+                                              },
+                         "mode.duel":  {
+                                           "source":  "1v1",
+                                           "translation":  ""
+                                       },
+                         "mode.deathmatch":  {
+                                                 "source":  "Arena",
+                                                 "translation":  ""
+                                             },
+                         "mode.survival":  {
+                                               "source":  "Survival",
+                                               "translation":  ""
+                                           },
+                         "mode.unavailable":  {
+                                                  "source":  "Soon",
+                                                  "translation":  ""
+                                              },
+                         "mode.duelDescription":  {
+                                                      "source":  "Knock your opponent out of the arena",
+                                                      "translation":  ""
+                                                  },
+                         "mode.deathmatchDescription":  {
+                                                            "source":  "Be the last spinner standing in the arena",
+                                                            "translation":  ""
+                                                        },
+                         "mode.survivalDescription":  {
+                                                          "source":  "Hold out against enemy waves",
+                                                          "translation":  ""
+                                                      },
+                         "menu.settings":  {
+                                               "source":  "Settings",
+                                               "translation":  ""
+                                           },
+                         "settings.enemies":  {
+                                                  "source":  "Bots",
+                                                  "translation":  ""
+                                              },
+                         "settings.botLevel":  {
+                                                   "source":  "Bot level",
+                                                   "translation":  ""
+                                               },
+                         "bot.easy":  {
+                                          "source":  "Easy",
+                                          "translation":  ""
+                                      },
+                         "bot.normal":  {
+                                            "source":  "Normal",
+                                            "translation":  ""
+                                        },
+                         "bot.hard":  {
+                                          "source":  "Hard",
+                                          "translation":  ""
+                                      },
+                         "menu.start":  {
+                                            "source":  "Start",
+                                            "translation":  ""
+                                        },
+                         "menu.play":  {
+                                           "source":  "Play",
+                                           "translation":  ""
+                                       },
+                         "menu.workshop":  {
+                                               "source":  "Workshop",
+                                               "translation":  ""
+                                           },
+                         "menu.dailyTasks":  {
+                                                 "source":  "Daily missions",
+                                                 "translation":  ""
+                                             },
+                         "menu.freeChest":  {
+                                                "source":  "Free chest",
+                                                "translation":  ""
+                                            },
+                         "menu.taskPlay":  {
+                                               "source":  "Play 3 battles",
+                                               "translation":  ""
+                                           },
+                         "menu.taskWin":  {
+                                              "source":  "Win 2 battles",
+                                              "translation":  ""
+                                          },
+                         "menu.taskDamage":  {
+                                                 "source":  "Deal 5000 damage",
+                                                 "translation":  ""
+                                             },
+                         "menu.shop":  {
+                                           "source":  "Shop",
+                                           "translation":  ""
+                                       },
+                         "menu.achievements":  {
+                                                   "source":  "Achievements",
+                                                   "translation":  ""
+                                               },
+                         "menu.news":  {
+                                           "source":  "News",
+                                           "translation":  ""
+                                       },
+                         "menu.sound":  {
+                                            "source":  "Sound on",
+                                            "translation":  ""
+                                        },
+                         "menu.soundOff":  {
+                                               "source":  "Sound off",
+                                               "translation":  ""
+                                           },
+                         "menu.addCurrency":  {
+                                                  "source":  "Add currency",
+                                                  "translation":  ""
+                                              },
+                         "menu.controls":  {
+                                               "source":  "Menu controls",
+                                               "translation":  ""
+                                           },
+                         "menu.sections":  {
+                                               "source":  "Menu sections",
+                                               "translation":  ""
+                                           },
+                         "menu.selected":  {
+                                               "source":  "Selected",
+                                               "translation":  ""
+                                           },
+                         "menu.openChest":  {
+                                                "source":  "Open chest",
+                                                "translation":  ""
+                                            },
+                         "rewards.title":  {
+                                               "source":  "Timed chests",
+                                               "translation":  ""
+                                           },
+                         "rewards.open":  {
+                                              "source":  "Open",
+                                              "translation":  ""
+                                          },
+                         "rewards.claimed":  {
+                                                 "source":  "Claimed",
+                                                 "translation":  ""
+                                             },
+                         "rewards.received":  {
+                                                  "source":  "Reward received",
+                                                  "translation":  ""
+                                              },
+                         "rewards.parts":  {
+                                               "source":  "Parts",
+                                               "translation":  ""
+                                           },
+                         "rewards.trail":  {
+                                               "source":  "Trail",
+                                               "translation":  ""
+                                           },
+                         "rewards.aura":  {
+                                              "source":  "Aura",
+                                              "translation":  ""
+                                          },
+                         "rewards.model":  {
+                                               "source":  "Model",
+                                               "translation":  ""
+                                           },
+                         "rewards.compensation":  {
+                                                      "source":  "Compensation",
+                                                      "translation":  ""
+                                                  },
+                         "rewards.continue":  {
+                                                  "source":  "Continue",
+                                                  "translation":  ""
+                                              },
+                         "rewards.close":  {
+                                               "source":  "Close rewards",
+                                               "translation":  ""
+                                           },
+                         "dev.settings":  {
+                                              "source":  "Development settings",
+                                              "translation":  ""
+                                          },
+                         "workshop.title":  {
+                                                "source":  "Workshop",
+                                                "translation":  ""
+                                            },
+                         "workshop.style":  {
+                                                "source":  "Style",
+                                                "translation":  ""
+                                            },
+                         "workshop.tuning":  {
+                                                 "source":  "Combat tuning",
+                                                 "translation":  ""
+                                             },
+                         "workshop.appearance":  {
+                                                     "source":  "Appearance",
+                                                     "translation":  ""
+                                                 },
+                         "workshop.upgrades":  {
+                                                   "source":  "Upgrades",
+                                                   "translation":  ""
+                                               },
+                         "workshop.previewTitle":  {
+                                                       "source":  "Your spinner",
+                                                       "translation":  ""
+                                                   },
+                         "workshop.previewHint":  {
+                                                      "source":  "Drag to rotate. Preview does not change equipped items.",
+                                                      "translation":  ""
+                                                  },
+                         "workshop.rotate":  {
+                                                 "source":  "Rotate spinner",
+                                                 "translation":  ""
+                                             },
+                         "workshop.elements":  {
+                                                   "source":  "Elements",
+                                                   "translation":  ""
+                                               },
+                         "workshop.models":  {
+                                                 "source":  "Model",
+                                                 "translation":  ""
+                                             },
+                         "workshop.colors":  {
+                                                 "source":  "Colors",
+                                                 "translation":  ""
+                                             },
+                         "workshop.trails":  {
+                                                 "source":  "Trail",
+                                                 "translation":  ""
+                                             },
+                         "workshop.auras":  {
+                                                "source":  "Aura",
+                                                "translation":  ""
+                                            },
+                         "workshop.offers":  {
+                                                 "source":  "Premium",
+                                                 "translation":  ""
+                                             },
+                         "workshop.owned":  {
+                                                "source":  "Owned",
+                                                "translation":  ""
+                                            },
+                         "workshop.equipped":  {
+                                                   "source":  "Equipped",
+                                                   "translation":  ""
+                                               },
+                         "workshop.buy":  {
+                                              "source":  "Buy",
+                                              "translation":  ""
+                                          },
+                         "workshop.equip":  {
+                                                "source":  "Equip",
+                                                "translation":  ""
+                                            },
+                         "workshop.previewing":  {
+                                                     "source":  "Previewing",
+                                                     "translation":  ""
+                                                 },
+                         "workshop.available":  {
+                                                    "source":  "Available",
+                                                    "translation":  ""
+                                                },
+                         "workshop.premium":  {
+                                                  "source":  "Premium",
+                                                  "translation":  ""
+                                              },
+                         "workshop.yan":  {
+                                              "source":  "Yan",
+                                              "translation":  ""
+                                          },
+                         "workshop.unavailable":  {
+                                                      "source":  "Payments are unavailable",
+                                                      "translation":  ""
+                                                  },
+                         "workshop.insufficient":  {
+                                                       "source":  "Not enough parts",
+                                                       "translation":  ""
+                                                   },
+                         "workshop.modelLoadFailed":  {
+                                                          "source":  "Model could not be loaded. Using the default model.",
+                                                          "translation":  ""
+                                                      },
+                         "upgrade.maxRpm":  {
+                                                "source":  "Maximum RPM",
+                                                "translation":  ""
+                                            },
+                         "upgrade.damage":  {
+                                                "source":  "Damage",
+                                                "translation":  ""
+                                            },
+                         "upgrade.dash":  {
+                                              "source":  "Dash cooldown",
+                                              "translation":  ""
+                                          },
+                         "upgrade.ultimate":  {
+                                                  "source":  "Charge",
+                                                  "translation":  ""
+                                              },
+                         "common.back":  {
+                                             "source":  "Back",
+                                             "translation":  ""
+                                         },
+                         "common.previous":  {
+                                                 "source":  "Previous",
+                                                 "translation":  ""
+                                             },
+                         "common.next":  {
+                                             "source":  "Next",
+                                             "translation":  ""
+                                         },
+                         "parts.name":  {
+                                            "source":  "Parts",
+                                            "translation":  ""
+                                        },
+                         "unit.secondsShort":  {
+                                                   "source":  "sec",
+                                                   "translation":  ""
+                                               },
+                         "result.victory":  {
+                                                "source":  "Victory",
+                                                "translation":  ""
+                                            },
+                         "result.defeat":  {
+                                               "source":  "Defeat",
+                                               "translation":  ""
+                                           },
+                         "result.earned":  {
+                                               "source":  "Reward",
+                                               "translation":  ""
+                                           },
+                         "result.balance":  {
+                                                "source":  "Balance",
+                                                "translation":  ""
+                                            },
+                         "result.replay":  {
+                                               "source":  "Play again",
+                                               "translation":  ""
+                                           },
+                         "result.double":  {
+                                               "source":  "Reward ×2",
+                                               "translation":  ""
+                                           },
+                         "result.doubleClaimed":  {
+                                                      "source":  "Reward claimed",
+                                                      "translation":  ""
+                                                  },
+                         "result.menu":  {
+                                             "source":  "Main menu",
+                                             "translation":  ""
+                                         },
+                         "auth.open":  {
+                                           "source":  "Cloud save",
+                                           "translation":  ""
+                                       },
+                         "auth.title":  {
+                                            "source":  "Save progress in the cloud?",
+                                            "translation":  ""
+                                        },
+                         "auth.benefit":  {
+                                              "source":  "Signing in makes progress available on your other devices. You can keep playing as a guest without signing in.",
+                                              "translation":  ""
+                                          },
+                         "auth.confirm":  {
+                                              "source":  "Sign in",
+                                              "translation":  ""
+                                          },
+                         "auth.cancel":  {
+                                             "source":  "Continue as guest",
+                                             "translation":  ""
+                                         },
+                         "auth.success":  {
+                                              "source":  "Cloud saves enabled",
+                                              "translation":  ""
+                                          },
+                         "catalog.model.default":  {
+                                                       "source":  "Stock",
+                                                       "translation":  ""
+                                                   },
+                         "catalog.model.street":  {
+                                                      "source":  "Street",
+                                                      "translation":  ""
+                                                  },
+                         "catalog.model.turbo":  {
+                                                     "source":  "Turbo",
+                                                     "translation":  ""
+                                                 },
+                         "catalog.model.legend":  {
+                                                      "source":  "Legend",
+                                                      "translation":  ""
+                                                  },
+                         "catalog.model.neon":  {
+                                                    "source":  "Neon",
+                                                    "translation":  ""
+                                                },
+                         "catalog.model.champion":  {
+                                                        "source":  "Champion",
+                                                        "translation":  ""
+                                                    },
+                         "catalog.color.default":  {
+                                                       "source":  "Factory blue",
+                                                       "translation":  ""
+                                                   },
+                         "catalog.color.red":  {
+                                                   "source":  "Racing red",
+                                                   "translation":  ""
+                                               },
+                         "catalog.color.blue":  {
+                                                    "source":  "Electric blue",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.green":  {
+                                                     "source":  "Toxic green",
+                                                     "translation":  ""
+                                                 },
+                         "catalog.color.violet":  {
+                                                      "source":  "Neon violet",
+                                                      "translation":  ""
+                                                  },
+                         "catalog.color.gold":  {
+                                                    "source":  "Workshop gold",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.white":  {
+                                                     "source":  "White",
+                                                     "translation":  ""
+                                                 },
+                         "catalog.color.black":  {
+                                                     "source":  "Black",
+                                                     "translation":  ""
+                                                 },
+                         "catalog.color.gray":  {
+                                                    "source":  "Gray",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.navy":  {
+                                                    "source":  "Navy",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.darkGreen":  {
+                                                         "source":  "Dark green",
+                                                         "translation":  ""
+                                                     },
+                         "catalog.color.burgundy":  {
+                                                        "source":  "Burgundy",
+                                                        "translation":  ""
+                                                    },
+                         "catalog.color.orange":  {
+                                                      "source":  "Orange",
+                                                      "translation":  ""
+                                                  },
+                         "catalog.color.yellow":  {
+                                                      "source":  "Yellow",
+                                                      "translation":  ""
+                                                  },
+                         "catalog.color.pink":  {
+                                                    "source":  "Pink",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.mint":  {
+                                                    "source":  "Mint",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.lime":  {
+                                                    "source":  "Lime",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.cyan":  {
+                                                    "source":  "Cyan",
+                                                    "translation":  ""
+                                                },
+                         "catalog.color.lavender":  {
+                                                        "source":  "Lavender",
+                                                        "translation":  ""
+                                                    },
+                         "catalog.color.raspberry":  {
+                                                         "source":  "Raspberry",
+                                                         "translation":  ""
+                                                     },
+                         "catalog.trail.default":  {
+                                                       "source":  "White",
+                                                       "translation":  ""
+                                                   },
+                         "catalog.trail.fire":  {
+                                                    "source":  "Fire",
+                                                    "translation":  ""
+                                                },
+                         "catalog.trail.ice":  {
+                                                   "source":  "Ice",
+                                                   "translation":  ""
+                                               },
+                         "catalog.trail.toxic":  {
+                                                     "source":  "Toxic",
+                                                     "translation":  ""
+                                                 },
+                         "catalog.trail.neon":  {
+                                                    "source":  "Neon",
+                                                    "translation":  ""
+                                                },
+                         "catalog.trail.gold":  {
+                                                    "source":  "Gold",
+                                                    "translation":  ""
+                                                },
+                         "catalog.aura.one":  {
+                                                  "source":  "Aura 1",
+                                                  "translation":  ""
+                                              },
+                         "catalog.aura.two":  {
+                                                  "source":  "Aura 2",
+                                                  "translation":  ""
+                                              },
+                         "catalog.aura.three":  {
+                                                    "source":  "Aura 3",
+                                                    "translation":  ""
+                                                },
+                         "offer.noAds":  {
+                                             "source":  "No Ads",
+                                             "translation":  ""
+                                         },
+                         "offer.parts500":  {
+                                                "source":  "500 parts",
+                                                "translation":  ""
+                                            },
+                         "offer.parts3000":  {
+                                                 "source":  "3000 parts",
+                                                 "translation":  ""
+                                             },
+                         "offer.parts7500":  {
+                                                 "source":  "7,500 parts",
+                                                 "translation":  ""
+                                             },
+                         "offer.parts21000":  {
+                                                  "source":  "21,000 parts",
+                                                  "translation":  ""
+                                              },
+                         "offer.parts21000Aura3":  {
+                                                       "source":  "21,000 parts + Aura 3",
+                                                       "translation":  ""
+                                                   },
+                         "offer.parts50000":  {
+                                                  "source":  "50,000 parts",
+                                                  "translation":  ""
+                                              },
+                         "common.level":  {
+                                              "source":  "LVL",
+                                              "translation":  ""
+                                          },
+                         "menu.selectElement":  {
+                                                    "source":  "Select element",
+                                                    "translation":  ""
+                                                },
+                         "element.fire":  {
+                                              "source":  "Fire",
+                                              "translation":  ""
+                                          },
+                         "element.ice":  {
+                                             "source":  "Ice",
+                                             "translation":  ""
+                                         },
+                         "element.earth":  {
+                                               "source":  "Earth",
+                                               "translation":  ""
+                                           },
+                         "element.lightning":  {
+                                                   "source":  "Lightning",
+                                                   "translation":  ""
+                                               },
+                         "hud.dash":  {
+                                          "source":  "Dash",
+                                          "translation":  ""
+                                      },
+                         "hud.ultimate":  {
+                                              "source":  "Ultimate",
+                                              "translation":  ""
+                                          },
+                         "hud.ready":  {
+                                           "source":  "Ready",
+                                           "translation":  ""
+                                       },
+                         "hud.active":  {
+                                            "source":  "Active",
+                                            "translation":  ""
+                                        },
+                         "hud.player":  {
+                                            "source":  "Player",
+                                            "translation":  ""
+                                        },
+                         "hud.bot":  {
+                                         "source":  "Bot",
+                                         "translation":  ""
+                                     },
+                         "hud.move":  {
+                                          "source":  "Move",
+                                          "translation":  ""
+                                      },
+                         "bonus.speed":  {
+                                             "source":  "Speed bonus",
+                                             "translation":  ""
+                                         },
+                         "bonus.critSpeed":  {
+                                                 "source":  "Critical speed bonus",
+                                                 "translation":  ""
+                                             },
+                         "bonus.critDamage":  {
+                                                  "source":  "Critical damage bonus",
+                                                  "translation":  ""
+                                              },
+                         "bonus.damage":  {
+                                              "source":  "Damage bonus",
+                                              "translation":  ""
+                                          },
+                         "bonus.heal":  {
+                                            "source":  "Healing",
+                                            "translation":  ""
+                                        },
+                         "orientation.rotate":  {
+                                                    "source":  "Rotate your device",
+                                                    "translation":  ""
+                                                }
+                     }
+}

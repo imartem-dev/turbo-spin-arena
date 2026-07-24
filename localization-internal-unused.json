@@ -1,0 +1,638 @@
+{
+  "game.title": {
+    "source": "Turbo Spin Arena",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.mode": {
+    "source": "Mode",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.multiplayer": {
+    "source": "Multiplayer",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.survival": {
+    "source": "Survival",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.unavailable": {
+    "source": "Soon",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.duelDescription": {
+    "source": "Knock your opponent out of the arena",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.deathmatchDescription": {
+    "source": "Be the last spinner standing in the arena",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "mode.survivalDescription": {
+    "source": "Hold out against enemy waves",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "settings.enemies": {
+    "source": "Bots",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.start": {
+    "source": "Start",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.dailyTasks": {
+    "source": "Daily missions",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.freeChest": {
+    "source": "Free chest",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.taskPlay": {
+    "source": "Play 3 battles",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.taskWin": {
+    "source": "Win 2 battles",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.taskDamage": {
+    "source": "Deal 5000 damage",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.achievements": {
+    "source": "Achievements",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.news": {
+    "source": "News",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.addCurrency": {
+    "source": "Add currency",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.selected": {
+    "source": "Selected",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "rewards.trail": {
+    "source": "Trail",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "rewards.aura": {
+    "source": "Aura",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "rewards.model": {
+    "source": "Model",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.style": {
+    "source": "Style",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.tuning": {
+    "source": "Combat tuning",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.previewTitle": {
+    "source": "Your spinner",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.previewHint": {
+    "source": "Drag to rotate. Preview does not change equipped items.",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.yan": {
+    "source": "Yan",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "workshop.modelLoadFailed": {
+    "source": "Model could not be loaded. Using the default model.",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "upgrade.maxRpm": {
+    "source": "Maximum RPM",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "upgrade.damage": {
+    "source": "Damage",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "upgrade.dash": {
+    "source": "Dash cooldown",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "upgrade.ultimate": {
+    "source": "Charge",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "common.back": {
+    "source": "Back",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "result.victory": {
+    "source": "Victory",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "result.defeat": {
+    "source": "Defeat",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "result.balance": {
+    "source": "Balance",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "result.doubleClaimed": {
+    "source": "Reward claimed",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "auth.success": {
+    "source": "Cloud saves enabled",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.model.neon": {
+    "source": "Neon",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.model.champion": {
+    "source": "Champion",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.color.default": {
+    "source": "Factory blue",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.color.red": {
+    "source": "Racing red",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:42"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.blue": {
+    "source": "Electric blue",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:45"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.green": {
+    "source": "Toxic green",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:46"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.violet": {
+    "source": "Neon violet",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:47"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.gold": {
+    "source": "Workshop gold",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.color.white": {
+    "source": "White",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:33"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.black": {
+    "source": "Black",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:34"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.gray": {
+    "source": "Gray",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:35"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.navy": {
+    "source": "Navy",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:36"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.darkGreen": {
+    "source": "Dark green",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:37"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.burgundy": {
+    "source": "Burgundy",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:38"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.orange": {
+    "source": "Orange",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:43"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.yellow": {
+    "source": "Yellow",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:44"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.pink": {
+    "source": "Pink",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:51"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.mint": {
+    "source": "Mint",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:52"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.lime": {
+    "source": "Lime",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:53"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.cyan": {
+    "source": "Cyan",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:54"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.lavender": {
+    "source": "Lavender",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:55"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.color.raspberry": {
+    "source": "Raspberry",
+    "translation": "",
+    "category": "internal",
+    "context": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility.",
+    "usedAt": [
+      "src/progression/catalog.ts:56"
+    ],
+    "reason": "Color labels are catalog metadata; the player sees the selected color visually and the code does not pass these names to UI text or accessibility."
+  },
+  "catalog.trail.default": {
+    "source": "White",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.trail.fire": {
+    "source": "Fire",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.trail.ice": {
+    "source": "Ice",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.trail.toxic": {
+    "source": "Toxic",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.trail.neon": {
+    "source": "Neon",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "catalog.trail.gold": {
+    "source": "Gold",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "menu.selectElement": {
+    "source": "Select element",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "hud.ready": {
+    "source": "Ready",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "hud.active": {
+    "source": "Active",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "hud.bot": {
+    "source": "Bot",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "bonus.speed": {
+    "source": "Speed bonus",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "bonus.critSpeed": {
+    "source": "Critical speed bonus",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "bonus.critDamage": {
+    "source": "Critical damage bonus",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "bonus.damage": {
+    "source": "Damage bonus",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  },
+  "bonus.heal": {
+    "source": "Healing",
+    "translation": "",
+    "category": "unused",
+    "context": "No runtime call or markup reference found outside the translation catalog.",
+    "usedAt": [],
+    "reason": "The key is declared and has an English source value, but no inspected project file calls or binds it."
+  }
+}

@@ -21,21 +21,8 @@ export type CombatHudElements = {
   ultimate: AbilityHudElements | null;
 };
 
-type HudParticipant = { name: string; currentRPM: number; maxRPM: number };
+type HudParticipant = { name: string; avatarUrl?: string; currentRPM: number; maxRPM: number };
 type Translate = (key: TranslationKey) => string;
-
-export type LeaderboardViewRow = {
-  id: string;
-  rank: number;
-  name: string;
-  kills: number;
-  deaths: number;
-  criticalHits: number;
-  rating: number;
-  player: boolean;
-  respawning: boolean;
-  invulnerable: boolean;
-};
 
 export function createCombatHud(
   player: HudParticipant,
@@ -51,85 +38,21 @@ export function createCombatHud(
 
   if (playerRoot) {
     playerRoot.replaceChildren();
-    rpm.push(createRpmCard(playerRoot, player, "player", true));
+    rpm.push(createRpmCard(playerRoot, player, "player", true, t("hud.health")));
     dash = createAbilityHud(playerRoot, "dash", t("hud.dash"), t("hud.ready").toUpperCase());
     ultimate = createAbilityHud(playerRoot, "ultimate", t("hud.ultimate"), "0%");
   }
 
   if (enemyRoot) {
     enemyRoot.replaceChildren();
-    if (mode === "duel" && enemies[0]) rpm.push(createRpmCard(enemyRoot, enemies[0], "enemy", false));
+    if (mode === "duel" && enemies[0]) rpm.push(createRpmCard(enemyRoot, enemies[0], "enemy", false, t("hud.health")));
   }
 
   return { rpm, dash, ultimate };
 }
 
-export function renderCompactLeaderboard(
-  root: HTMLElement | null,
-  rows: LeaderboardViewRow[],
-  t: Translate,
-): void {
-  if (!root) return;
-  const uniqueRows = selectCompactLeaderboardRows(rows);
-  const playerRow = rows.find((row) => row.player);
-  const place = document.createElement("div");
-  place.className = "compact-place";
-  place.textContent = playerRow ? `${t("hud.place")} #${playerRow.rank}` : t("hud.leaderboard");
-  const list = document.createElement("ol");
-  list.className = "compact-leaderboard-list";
-  for (const row of uniqueRows) {
-    const item = document.createElement("li");
-    item.className = row.player ? "player" : "";
-    item.append(
-      Object.assign(document.createElement("span"), { textContent: `#${row.rank}` }),
-      Object.assign(document.createElement("strong"), { textContent: row.name }),
-      Object.assign(document.createElement("span"), { textContent: String(row.rating) }),
-    );
-    list.append(item);
-  }
-  root.replaceChildren(place, list);
-}
-
-export function selectCompactLeaderboardRows(rows: LeaderboardViewRow[]): LeaderboardViewRow[] {
-  return rows
-    .filter((row, index) => index < 3 || row.player)
-    .filter((row, index, all) => all.findIndex((candidate) => candidate.id === row.id) === index);
-}
-
-export function renderFullLeaderboard(
-  root: HTMLElement | null,
-  rows: LeaderboardViewRow[],
-  t: Translate,
-): void {
-  if (!root) return;
-  const title = document.createElement("div");
-  title.className = "deathmatch-leaderboard-title";
-  title.textContent = t("mode.deathmatch");
-  const table = document.createElement("table");
-  table.className = "deathmatch-leaderboard-table";
-  const header = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  for (const label of ["#", t("hud.name"), t("hud.killsShort"), t("hud.deathsShort"), t("hud.critShort"), t("hud.rating")]) {
-    const cell = document.createElement("th");
-    cell.textContent = label;
-    headerRow.append(cell);
-  }
-  header.append(headerRow);
-  const body = document.createElement("tbody");
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    tr.classList.toggle("player", row.player);
-    tr.classList.toggle("respawning", row.respawning);
-    tr.classList.toggle("invulnerable", row.invulnerable);
-    for (const value of [row.rank, row.name, row.kills, row.deaths, row.criticalHits, row.rating]) {
-      const cell = document.createElement("td");
-      cell.textContent = String(value);
-      tr.append(cell);
-    }
-    body.append(tr);
-  }
-  table.append(header, body);
-  root.replaceChildren(title, table);
+export function formatAliveCounter(alive: number, total: number): string {
+  return `${Math.max(0, alive)}/${Math.max(0, total)}`;
 }
 
 function createRpmCard(
@@ -137,14 +60,19 @@ function createRpmCard(
   participant: HudParticipant,
   variant: "player" | "enemy",
   includeBonuses: boolean,
+  healthUnit: string,
 ): RpmHudElements {
   const card = document.createElement("div");
   card.className = `rpm-card ${variant}`;
   const label = document.createElement("div");
   label.className = "rpm-label";
+  const identity = document.createElement("div");
+  identity.className = "rpm-identity";
+  if (variant === "enemy") identity.append(createOpponentAvatar(participant.avatarUrl));
+  identity.append(Object.assign(document.createElement("span"), { textContent: participant.name }));
   label.append(
-    Object.assign(document.createElement("span"), { textContent: participant.name }),
-    Object.assign(document.createElement("span"), { textContent: `${Math.ceil(participant.currentRPM)} / ${Math.ceil(participant.maxRPM)} RPM` }),
+    identity,
+    Object.assign(document.createElement("span"), { textContent: `${Math.ceil(participant.currentRPM)} / ${Math.ceil(participant.maxRPM)} ${healthUnit}` }),
   );
   const value = label.lastElementChild as HTMLElement;
   const track = document.createElement("div");
@@ -164,6 +92,23 @@ function createRpmCard(
   card.append(label, track);
   root.append(card);
   return { root: card, fill, cap, value, bonusIcons };
+}
+
+function createOpponentAvatar(avatarUrl: string | undefined): HTMLElement {
+  const avatar = document.createElement("span");
+  avatar.className = "opponent-avatar";
+  if (!avatarUrl) return avatar;
+
+  const image = document.createElement("img");
+  image.src = avatarUrl;
+  image.alt = "";
+  image.referrerPolicy = "no-referrer";
+  image.addEventListener("error", () => {
+    image.remove();
+    avatar.classList.add("fallback");
+  }, { once: true });
+  avatar.append(image);
+  return avatar;
 }
 
 function createAbilityHud(

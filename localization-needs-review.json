@@ -1,0 +1,32 @@
+{
+  "workshop.models": {
+    "source": "Model",
+    "translation": "",
+    "category": "uncertain",
+    "context": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously.",
+    "usedAt": [
+      "src/ui/gameUi.ts:160"
+    ],
+    "reason": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously."
+  },
+  "workshop.trails": {
+    "source": "Trail",
+    "translation": "",
+    "category": "uncertain",
+    "context": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously.",
+    "usedAt": [
+      "src/ui/gameUi.ts:162"
+    ],
+    "reason": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously."
+  },
+  "workshop.auras": {
+    "source": "Aura",
+    "translation": "",
+    "category": "uncertain",
+    "context": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously.",
+    "usedAt": [
+      "src/ui/gameUi.ts:163"
+    ],
+    "reason": "A translation entry exists, but the inspected runtime path is absent, conditional, or only indirectly represented by configuration; its player exposure cannot be proven unambiguously."
+  }
+}
